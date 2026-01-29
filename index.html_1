@@ -1,0 +1,642 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Artin & Aiden • Behavior Tracker</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🌟</text></svg>">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@500;600;700&family=Source+Sans+3:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <style>
+    :root {
+      --sand-primary: #C9A882;
+      --sand-light: #D4B996;
+      --sand-lighter: #E5D4B7;
+      --sand-warm: #A8916B;
+      --sky-blue: #87CEEB;
+      --sky-soft: #B8D4E8;
+      --fern-green: #4F7942;
+      --sage-green: #6B8E4E;
+      --slate: #4A4A4A;
+      --cream: #FDF8F3;
+      --danger: #B85C38;
+    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html { font-size: 16px; }
+    body {
+      font-family: 'Source Sans 3', -apple-system, sans-serif;
+      background: linear-gradient(165deg, var(--cream) 0%, var(--sand-lighter) 50%, var(--sand-light) 100%);
+      min-height: 100vh;
+      color: var(--slate);
+    }
+    h1, h2, h3, h4 { font-family: 'Playfair Display', Georgia, serif; }
+    ::-webkit-scrollbar { width: 6px; }
+    ::-webkit-scrollbar-track { background: var(--sand-lighter); border-radius: 3px; }
+    ::-webkit-scrollbar-thumb { background: var(--sand-warm); border-radius: 3px; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .fade-in { animation: fadeIn 0.3s ease-out; }
+    .spin { animation: spin 1s linear infinite; }
+    .btn-bounce:active { transform: scale(0.92); }
+    @media (max-width: 768px) { html { font-size: 14px; } }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+  <script type="text/babel">
+const { useState, useEffect, useRef } = React;
+
+const GOOGLE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxuEp2AwHSV3rN7D1Je1btpdtG1quMi6aaazCqqSxUJUq1rOfWzkXVb81Y2wnMQaC5O/exec';
+const PASSWORD = 'artaiden';
+
+// Icons Component
+const Icon = ({ name, size = 20, color = 'currentColor' }) => {
+  const ref = useRef(null);
+  useEffect(() => {
+    if (ref.current && lucide.icons[name]) {
+      ref.current.innerHTML = '';
+      const icon = lucide.createElement(lucide.icons[name]);
+      icon.setAttribute('width', size);
+      icon.setAttribute('height', size);
+      icon.setAttribute('stroke', color);
+      icon.setAttribute('stroke-width', '2');
+      ref.current.appendChild(icon);
+    }
+  }, [name, size, color]);
+  return <span ref={ref} style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }} />;
+};
+
+// ============ ALL BEHAVIORS BY CATEGORY ============
+const behaviorsByCategory = {
+  'Punctuality': {
+    icon: 'Clock',
+    color: '#B8D4E8',
+    textColor: '#2C3E50',
+    items: [
+      { id: 'wake', label: 'Waking up on time', posLabel: 'Woke up on time', negLabel: 'Woke up late', points: 10, icon: 'Sunrise' },
+      { id: 'school-ready', label: 'Ready for school', posLabel: 'Ready on time', negLabel: 'Late for school', points: 10, icon: 'Backpack' },
+      { id: 'homework-start', label: 'Starting homework', posLabel: 'Started on time', negLabel: 'Started late', points: 10, icon: 'PenLine' },
+      { id: 'bed', label: 'Going to bed', posLabel: 'Bed on time', negLabel: 'Bed late', points: 10, icon: 'Moon' },
+    ]
+  },
+  'Eating': {
+    icon: 'Utensils',
+    color: '#C9E4CA',
+    textColor: '#2D5A2E',
+    items: [
+      { id: 'breakfast', label: 'Eating breakfast', posLabel: 'Ate breakfast', negLabel: 'Skipped breakfast', points: 10, icon: 'Coffee' },
+      { id: 'lunch-school', label: 'Eating lunch at school', posLabel: 'Ate school lunch', negLabel: 'Skipped school lunch', points: 10, icon: 'Sandwich' },
+      { id: 'snacks-school', label: 'Eating school snacks', posLabel: 'Ate school snacks', negLabel: 'Skipped school snacks', points: 5, icon: 'Cookie' },
+      { id: 'vegetables', label: 'Eating vegetables', posLabel: 'Ate vegetables', negLabel: 'Refused vegetables', points: 15, icon: 'Salad' },
+      { id: 'fruits', label: 'Eating fruits', posLabel: 'Ate fruits', negLabel: 'Refused fruits', points: 10, icon: 'Apple' },
+      { id: 'finish-meal', label: 'Finishing meal', posLabel: 'Finished meal', negLabel: 'Did not finish meal', points: 10, icon: 'UtensilsCrossed' },
+      { id: 'picky', label: 'Picky eating', posLabel: 'Not picky today', negLabel: 'Was picky', points: 5, icon: 'ThumbsDown' },
+    ]
+  },
+  'Learning': {
+    icon: 'GraduationCap',
+    color: '#E8D4B8',
+    textColor: '#5A4A2D',
+    items: [
+      { id: 'homework', label: 'Completing homework', posLabel: 'Completed homework', negLabel: 'Did not complete homework', points: 15, icon: 'BookOpen' },
+      { id: 'reading', label: 'Reading books (20 min)', posLabel: 'Read 20 minutes', negLabel: 'Did not read', points: 15, icon: 'BookMarked' },
+      { id: 'book-chapter', label: 'Finishing book chapter', posLabel: 'Finished chapter', negLabel: 'Did not finish chapter', points: 20, icon: 'BookCheck' },
+    ]
+  },
+  'Character': {
+    icon: 'Heart',
+    color: '#E8B8D4',
+    textColor: '#5A2D4A',
+    items: [
+      { id: 'kind-words', label: 'Using kind words', posLabel: 'Used kind words', negLabel: 'Used unkind words', points: 5, icon: 'MessageCircleHeart' },
+      { id: 'sharing', label: 'Sharing with sibling', posLabel: 'Shared nicely', negLabel: 'Did not share', points: 10, icon: 'Users' },
+      { id: 'manners', label: 'Using good manners', posLabel: 'Good manners', negLabel: 'Bad manners', points: 5, icon: 'Sparkles' },
+      { id: 'helping', label: 'Helping without asking', posLabel: 'Helped voluntarily', negLabel: 'Refused to help', points: 15, icon: 'HandHelping' },
+      { id: 'fighting', label: 'Fighting with sibling', posLabel: 'No fighting today', negLabel: 'Fought with sibling', points: 10, icon: 'Swords' },
+      { id: 'talking-back', label: 'Talking back', posLabel: 'Respectful today', negLabel: 'Talked back', points: 10, icon: 'MessageSquareWarning' },
+      { id: 'curse', label: 'Curse words', posLabel: 'No bad words', negLabel: 'Used curse words', points: 10, icon: 'MessageSquareOff' },
+    ]
+  },
+  'Responsibility': {
+    icon: 'CheckSquare',
+    color: '#D4B8E8',
+    textColor: '#4A2D5A',
+    items: [
+      { id: 'chores', label: 'Completing chores', posLabel: 'Did chores', negLabel: 'Did not do chores', points: 10, icon: 'Brush' },
+      { id: 'basketball', label: 'Basketball practice', posLabel: 'Attended basketball', negLabel: 'Skipped basketball', points: 15, icon: 'Dribbble' },
+      { id: 'clean-room', label: 'Cleaning room', posLabel: 'Cleaned room', negLabel: 'Did not clean room', points: 10, icon: 'Home' },
+    ]
+  },
+  'Screen Time': {
+    icon: 'Smartphone',
+    color: '#FFE4E4',
+    textColor: '#8B3A3A',
+    items: [
+      { id: 'youtube', label: 'YouTube shorts', posLabel: 'No YouTube shorts', negLabel: 'Watched YouTube shorts', points: 5, icon: 'Youtube' },
+      { id: 'screen-limit', label: 'Screen time limit', posLabel: 'Stayed within limit', negLabel: 'Exceeded screen time', points: 10, icon: 'MonitorOff' },
+    ]
+  }
+};
+
+const rewards = [
+  { id: 'game15', points: 20, label: '15 min Game Time', icon: 'Gamepad2' },
+  { id: 'tv30', points: 30, label: '30 min TV Time', icon: 'Tv' },
+  { id: 'game30', points: 35, label: '30 min Game Time', icon: 'Gamepad' },
+  { id: 'snack', points: 40, label: 'Special Snack', icon: 'Popcorn' },
+  { id: 'movie', points: 50, label: 'Movie Night', icon: 'Film' },
+  { id: 'stayup', points: 60, label: 'Stay Up 30min Late', icon: 'MoonStar' },
+  { id: 'game60', points: 75, label: '1 Hour Game Time', icon: 'Trophy' },
+  { id: 'wish', points: 100, label: 'Free Wish Bonus', icon: 'Star' },
+  { id: 'boss', points: 150, label: 'Boss of Home (1hr)', icon: 'Crown' },
+  { id: 'outing', points: 200, label: 'Special Outing', icon: 'PartyPopper' },
+];
+
+const restrictions = [
+  { threshold: 0, label: 'No Game Time', icon: 'Gamepad2' },
+  { threshold: -10, label: 'No TV Time', icon: 'Tv' },
+  { threshold: -20, label: 'No YouTube', icon: 'Youtube' },
+  { threshold: -30, label: 'Early Bedtime', icon: 'Moon' },
+  { threshold: -50, label: 'No Weekend Fun', icon: 'CalendarOff' },
+];
+
+// Utilities
+const getColor = s => s >= 100 ? '#4F7942' : s >= 50 ? '#6B8E4E' : s >= 20 ? '#87CEEB' : s >= 0 ? '#C9A882' : s >= -20 ? '#D4966B' : '#B85C38';
+const fmtDate = d => new Date(d).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+const fmtTime = d => new Date(d).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+const today = () => new Date().toISOString().split('T')[0];
+const weekStart = () => { const d = new Date(); d.setDate(d.getDate() - d.getDay()); return d.toISOString().split('T')[0]; };
+
+// API
+const api = {
+  async getData() {
+    try {
+      const res = await fetch(`${GOOGLE_SCRIPT_URL}?action=getData`);
+      return res.json();
+    } catch (e) {
+      const saved = localStorage.getItem('bt_data_v4');
+      return saved ? JSON.parse(saved) : { scores: { Artin: 0, Aiden: 0 }, weeklyScores: { Artin: 0, Aiden: 0 }, history: { Artin: [], Aiden: [] }, claimed: { Artin: [], Aiden: [] } };
+    }
+  },
+  async recordBehavior(child, behavior) {
+    try { return fetch(GOOGLE_SCRIPT_URL + '?action=recordBehavior', { method: 'POST', body: JSON.stringify({ child, behavior }) }).then(r => r.json()); }
+    catch (e) { return { success: true }; }
+  },
+  async undoLast(child) {
+    try { return fetch(GOOGLE_SCRIPT_URL + '?action=undoLast', { method: 'POST', body: JSON.stringify({ child }) }).then(r => r.json()); }
+    catch (e) { return { success: true }; }
+  },
+  async claimReward(child, reward) {
+    try { return fetch(GOOGLE_SCRIPT_URL + '?action=claimReward', { method: 'POST', body: JSON.stringify({ child, reward }) }).then(r => r.json()); }
+    catch (e) { return { success: true }; }
+  },
+  async resetAll() {
+    try { return fetch(GOOGLE_SCRIPT_URL + '?action=resetAll', { method: 'POST' }).then(r => r.json()); }
+    catch (e) { return { success: true }; }
+  }
+};
+
+// Password Screen
+function PasswordScreen({ onUnlock }) {
+  const [pw, setPw] = useState('');
+  const [err, setErr] = useState(false);
+  const submit = e => { e.preventDefault(); if (pw === PASSWORD) { localStorage.setItem('bt_auth', '1'); onUnlock(); } else { setErr(true); setTimeout(() => setErr(false), 2000); } };
+  return (
+    <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
+      <div className="fade-in" style={{ background: 'white', borderRadius: 20, padding: '40px 32px', boxShadow: '0 16px 48px rgba(74,74,74,0.15)', textAlign: 'center', maxWidth: 380, width: '100%', border: '1px solid #E5D4B7' }}>
+        <div style={{ width: 72, height: 72, borderRadius: '50%', background: 'linear-gradient(135deg, #C9A882 0%, #A8916B 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 20px' }}>
+          <Icon name="Lock" size={32} color="white" />
+        </div>
+        <h1 style={{ margin: '0 0 6px', color: '#4A4A4A', fontSize: '1.75rem' }}>Behavior Tracker</h1>
+        <p style={{ color: '#6B7280', marginBottom: 24 }}>Enter family password</p>
+        <form onSubmit={submit}>
+          <input type="password" value={pw} onChange={e => setPw(e.target.value)} placeholder="Password" style={{ width: '100%', padding: '14px 18px', borderRadius: 10, border: `2px solid ${err ? '#B85C38' : '#E5D4B7'}`, fontSize: '1rem', marginBottom: 16, outline: 'none', background: '#FDFBF9' }} />
+          {err && <p style={{ color: '#B85C38', marginBottom: 12, fontSize: '0.9rem' }}>Incorrect password</p>}
+          <button type="submit" style={{ width: '100%', padding: '14px', borderRadius: 10, border: 'none', background: 'linear-gradient(135deg, #4F7942 0%, #6B8E4E 100%)', color: 'white', fontSize: '1rem', fontWeight: 600, cursor: 'pointer' }}>Unlock</button>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+// Behavior Row with +/- Buttons
+function BehaviorRow({ item, onAdd, onSubtract, loading }) {
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 0', borderBottom: '1px solid #E5D4B7' }}>
+      {/* Minus Button */}
+      <button onClick={() => onSubtract(item)} disabled={loading} className="btn-bounce" style={{
+        width: 44, height: 44, borderRadius: 12, border: 'none',
+        background: 'linear-gradient(135deg, #B85C38 0%, #D4714D 100%)',
+        color: 'white', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
+        boxShadow: '0 3px 10px rgba(184,92,56,0.3)', flexShrink: 0, transition: 'transform 0.1s'
+      }}>
+        <Icon name="Minus" size={22} color="white" />
+      </button>
+
+      {/* Label */}
+      <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
+        <div style={{ width: 38, height: 38, borderRadius: 10, background: '#F5F0EB', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+          <Icon name={item.icon} size={20} color="#A8916B" />
+        </div>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontWeight: 600, color: '#4A4A4A', fontSize: '0.95rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{item.label}</div>
+          <div style={{ fontSize: '0.75rem', color: '#888' }}>±{item.points} pts</div>
+        </div>
+      </div>
+
+      {/* Plus Button */}
+      <button onClick={() => onAdd(item)} disabled={loading} className="btn-bounce" style={{
+        width: 44, height: 44, borderRadius: 12, border: 'none',
+        background: 'linear-gradient(135deg, #4F7942 0%, #6B8E4E 100%)',
+        color: 'white', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
+        boxShadow: '0 3px 10px rgba(79,121,66,0.3)', flexShrink: 0, transition: 'transform 0.1s'
+      }}>
+        <Icon name="Plus" size={22} color="white" />
+      </button>
+    </div>
+  );
+}
+
+// Child Score Card
+function ScoreCard({ name, scores, weeklyScores, history, claimed, onRecord, onUndo, loading }) {
+  const score = scores[name] || 0;
+  const weeklyScore = weeklyScores[name] || 0;
+  const childHistory = history[name] || [];
+  const activeRestrictions = restrictions.filter(r => score <= r.threshold);
+  const hasRestrictions = activeRestrictions.length > 0;
+  const todayHistory = childHistory.filter(h => h.date === today());
+  const todayPoints = todayHistory.reduce((sum, h) => sum + h.points, 0);
+  const [expandedCat, setExpandedCat] = useState(null);
+
+  const handleAdd = (item) => {
+    onRecord(name, { id: item.id + '-pos', label: item.posLabel, points: item.points, type: 'positive', icon: item.icon });
+  };
+
+  const handleSubtract = (item) => {
+    onRecord(name, { id: item.id + '-neg', label: item.negLabel, points: -item.points, type: 'negative', icon: item.icon });
+  };
+
+  return (
+    <div className="fade-in" style={{ background: 'white', borderRadius: 20, boxShadow: '0 8px 32px rgba(74,74,74,0.1)', border: hasRestrictions ? '3px solid #B85C38' : '1px solid #E5D4B7', overflow: 'hidden' }}>
+      {/* Header */}
+      <div style={{ background: `linear-gradient(135deg, ${getColor(score)} 0%, ${getColor(score)}dd 100%)`, padding: 20, textAlign: 'center', color: 'white' }}>
+        <div style={{ width: 56, height: 56, borderRadius: '50%', background: 'rgba(255,255,255,0.25)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 10px' }}>
+          <Icon name="User" size={28} color="white" />
+        </div>
+        <h2 style={{ margin: '0 0 8px', fontSize: '1.5rem', fontWeight: 600 }}>{name}</h2>
+        <div style={{ fontSize: '2.5rem', fontWeight: 700 }}>{score}</div>
+        <div style={{ fontSize: '0.9rem', opacity: 0.9 }}>points</div>
+        <div style={{ marginTop: 10, display: 'flex', justifyContent: 'center', gap: 20, fontSize: '0.85rem' }}>
+          <span>Today: <strong>{todayPoints >= 0 ? '+' : ''}{todayPoints}</strong></span>
+          <span>Week: <strong>{weeklyScore >= 0 ? '+' : ''}{weeklyScore}</strong></span>
+        </div>
+      </div>
+
+      <div style={{ padding: 16 }}>
+        {/* Restrictions */}
+        {hasRestrictions && (
+          <div style={{ background: '#FEF2F2', border: '1px solid #FECACA', borderRadius: 10, padding: 12, marginBottom: 14 }}>
+            <div style={{ fontWeight: 600, color: '#B85C38', marginBottom: 6, fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: 6 }}>
+              <Icon name="AlertTriangle" size={16} color="#B85C38" /> Active Restrictions
+            </div>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+              {activeRestrictions.map(r => (
+                <span key={r.threshold} style={{ padding: '4px 10px', background: 'white', borderRadius: 6, color: '#B85C38', fontSize: '0.75rem', fontWeight: 500, display: 'flex', alignItems: 'center', gap: 4 }}>
+                  <Icon name={r.icon} size={12} color="#B85C38" /> {r.label}
+                </span>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Rewards Available */}
+        {score >= 20 && !hasRestrictions && (
+          <div style={{ background: '#FEF7ED', border: '1px solid #FCD9B6', borderRadius: 10, padding: 12, marginBottom: 14 }}>
+            <div style={{ fontWeight: 600, color: '#92400E', marginBottom: 6, fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: 6 }}>
+              <Icon name="Gift" size={16} color="#C9A882" /> Rewards Available
+            </div>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+              {rewards.filter(r => score >= r.points && !(claimed[name] || []).includes(r.id)).slice(0, 3).map(r => (
+                <span key={r.id} style={{ padding: '4px 10px', background: 'white', borderRadius: 6, color: '#92400E', fontSize: '0.75rem', fontWeight: 500, display: 'flex', alignItems: 'center', gap: 4 }}>
+                  <Icon name={r.icon} size={12} color="#C9A882" /> {r.label}
+                </span>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Categories */}
+        <div style={{ maxHeight: 450, overflowY: 'auto' }}>
+          {Object.entries(behaviorsByCategory).map(([catName, cat]) => (
+            <div key={catName} style={{ marginBottom: 12 }}>
+              <button 
+                onClick={() => setExpandedCat(expandedCat === catName ? null : catName)}
+                style={{ 
+                  width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                  padding: '10px 14px', background: cat.color, borderRadius: 10, border: 'none',
+                  cursor: 'pointer', marginBottom: expandedCat === catName ? 8 : 0
+                }}
+              >
+                <span style={{ display: 'flex', alignItems: 'center', gap: 8, fontWeight: 600, color: cat.textColor, fontSize: '0.9rem' }}>
+                  <Icon name={cat.icon} size={18} color={cat.textColor} />
+                  {catName}
+                  <span style={{ fontWeight: 400, fontSize: '0.8rem' }}>({cat.items.length})</span>
+                </span>
+                <Icon name={expandedCat === catName ? 'ChevronUp' : 'ChevronDown'} size={18} color={cat.textColor} />
+              </button>
+              
+              {expandedCat === catName && (
+                <div style={{ paddingLeft: 4, paddingRight: 4 }}>
+                  {cat.items.map(item => (
+                    <BehaviorRow key={item.id} item={item} onAdd={handleAdd} onSubtract={handleSubtract} loading={loading} />
+                  ))}
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+
+        {/* Undo */}
+        <button onClick={() => onUndo(name)} disabled={!childHistory.length || loading} style={{
+          width: '100%', marginTop: 12, padding: 12, borderRadius: 10,
+          border: '2px dashed #D4B996', background: childHistory.length ? 'white' : '#F5F5F5',
+          color: childHistory.length ? '#6B7280' : '#B0B0B0', cursor: childHistory.length ? 'pointer' : 'not-allowed',
+          fontSize: '0.9rem', fontWeight: 500, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8
+        }}>
+          <Icon name="Undo2" size={18} /> Undo Last ({childHistory.length})
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// History Panel
+function HistoryPanel({ history, selectedChild, setSelectedChild, historyView, setHistoryView }) {
+  const childHistory = history[selectedChild] || [];
+  const groupByDate = arr => { const g = {}; arr.forEach(e => { if (!g[e.date]) g[e.date] = []; g[e.date].push(e); }); return g; };
+  const ws = weekStart();
+  const filtered = historyView === 'daily' ? childHistory.filter(h => h.date === today()) : childHistory.filter(h => h.date >= ws);
+  const grouped = groupByDate(filtered);
+  const dates = Object.keys(grouped).sort().reverse();
+
+  return (
+    <div className="fade-in" style={{ background: 'white', borderRadius: 20, padding: 20, boxShadow: '0 8px 32px rgba(74,74,74,0.1)', border: '1px solid #E5D4B7' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, flexWrap: 'wrap', gap: 10 }}>
+        <h3 style={{ margin: 0, fontSize: '1.2rem', color: '#4A4A4A', display: 'flex', alignItems: 'center', gap: 8 }}>
+          <Icon name="BarChart3" size={22} color="#C9A882" /> History
+        </h3>
+        <div style={{ display: 'flex', gap: 6 }}>
+          {['Artin', 'Aiden'].map(n => (
+            <button key={n} onClick={() => setSelectedChild(n)} style={{ padding: '6px 14px', borderRadius: 8, border: 'none', background: selectedChild === n ? '#4F7942' : '#E5D4B7', color: selectedChild === n ? 'white' : '#4A4A4A', fontWeight: 600, fontSize: '0.85rem', cursor: 'pointer' }}>{n}</button>
+          ))}
+        </div>
+      </div>
+
+      <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
+        {[['daily', 'Today'], ['weekly', 'This Week']].map(([v, label]) => (
+          <button key={v} onClick={() => setHistoryView(v)} style={{ flex: 1, padding: '10px', borderRadius: 10, border: historyView === v ? 'none' : '1px solid #D4B996', background: historyView === v ? '#87CEEB' : 'white', color: historyView === v ? '#2C3E50' : '#4A4A4A', fontWeight: 600, fontSize: '0.85rem', cursor: 'pointer' }}>{label}</button>
+        ))}
+      </div>
+
+      <div style={{ maxHeight: 400, overflowY: 'auto' }}>
+        {!dates.length ? (
+          <div style={{ textAlign: 'center', padding: 40, color: '#9CA3AF' }}>
+            <Icon name="Inbox" size={48} color="#D4B996" />
+            <p style={{ marginTop: 12 }}>No activity recorded</p>
+          </div>
+        ) : dates.map(d => (
+          <div key={d} style={{ marginBottom: 16 }}>
+            <div style={{ padding: '8px 12px', background: '#F9F6F2', borderRadius: 8, marginBottom: 8, display: 'flex', justifyContent: 'space-between', borderLeft: '4px solid #C9A882' }}>
+              <span style={{ fontWeight: 600, color: '#4A4A4A', fontSize: '0.9rem' }}>{fmtDate(d)}</span>
+              <span style={{ padding: '2px 10px', borderRadius: 12, background: grouped[d].reduce((s, e) => s + e.points, 0) >= 0 ? '#E8F5E9' : '#FFEBEE', color: grouped[d].reduce((s, e) => s + e.points, 0) >= 0 ? '#4F7942' : '#B85C38', fontWeight: 600, fontSize: '0.85rem' }}>{grouped[d].reduce((s, e) => s + e.points, 0) >= 0 ? '+' : ''}{grouped[d].reduce((s, e) => s + e.points, 0)}</span>
+            </div>
+            {grouped[d].map((e, i) => (
+              <div key={i} style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 12px', marginLeft: 8, borderRadius: 8, background: e.type === 'positive' ? '#F0FDF4' : '#FEF2F2', fontSize: '0.85rem', marginBottom: 4 }}>
+                <span style={{ color: e.type === 'positive' ? '#4F7942' : '#B85C38' }}>{e.label}</span>
+                <span style={{ color: '#888' }}>{e.points > 0 ? '+' : ''}{e.points} • {fmtTime(e.timestamp)}</span>
+              </div>
+            ))}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// Rewards Panel
+function RewardsPanel({ scores, claimed, onClaim }) {
+  return (
+    <div className="fade-in" style={{ background: 'white', borderRadius: 20, padding: 20, boxShadow: '0 8px 32px rgba(74,74,74,0.1)', border: '1px solid #E5D4B7' }}>
+      <h3 style={{ margin: '0 0 16px', fontSize: '1.2rem', color: '#4A4A4A', display: 'flex', alignItems: 'center', gap: 8 }}>
+        <Icon name="Gift" size={22} color="#C9A882" /> Rewards Shop
+      </h3>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 20 }}>
+        {['Artin', 'Aiden'].map(name => (
+          <div key={name}>
+            <div style={{ textAlign: 'center', padding: 14, background: `${getColor(scores[name] || 0)}20`, borderRadius: 12, marginBottom: 12, border: `2px solid ${getColor(scores[name] || 0)}` }}>
+              <h4 style={{ margin: '0 0 4px', fontSize: '1rem', color: '#4A4A4A' }}>{name}</h4>
+              <span style={{ fontSize: '1.4rem', fontWeight: 700, color: getColor(scores[name] || 0) }}>{scores[name] || 0} pts</span>
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {rewards.map(r => {
+                const can = (scores[name] || 0) >= r.points;
+                const done = (claimed[name] || []).includes(r.id);
+                return (
+                  <div key={r.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 14px', borderRadius: 10, background: done ? '#E8F5E9' : can ? '#FEF7ED' : '#F5F5F5', border: `2px solid ${done ? '#4F7942' : can ? '#C9A882' : '#E5E5E5'}` }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                      <div style={{ width: 32, height: 32, borderRadius: 8, background: done ? '#4F7942' : can ? '#C9A882' : '#D4D4D4', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        <Icon name={r.icon} size={16} color="white" />
+                      </div>
+                      <div>
+                        <div style={{ fontWeight: 600, color: '#4A4A4A', fontSize: '0.85rem' }}>{r.label}</div>
+                        <div style={{ color: '#888', fontSize: '0.75rem' }}>{r.points} pts</div>
+                      </div>
+                    </div>
+                    {done ? (
+                      <span style={{ color: '#4F7942', fontWeight: 600, fontSize: '0.8rem' }}>✓ Claimed</span>
+                    ) : can ? (
+                      <button onClick={() => onClaim(name, r)} style={{ padding: '6px 14px', borderRadius: 8, border: 'none', background: 'linear-gradient(135deg, #C9A882 0%, #A8916B 100%)', color: 'white', fontWeight: 600, fontSize: '0.8rem', cursor: 'pointer' }}>Claim</button>
+                    ) : (
+                      <span style={{ color: '#9CA3AF', fontSize: '0.8rem' }}>{r.points - (scores[name] || 0)} more</span>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// Weekly Progress
+function WeeklyProgress({ weeklyScores }) {
+  const goal = 150;
+  return (
+    <div className="fade-in" style={{ background: 'white', borderRadius: 16, padding: 20, boxShadow: '0 8px 32px rgba(74,74,74,0.1)', border: '1px solid #E5D4B7' }}>
+      <div style={{ textAlign: 'center', marginBottom: 16 }}>
+        <h3 style={{ margin: '0 0 4px', fontSize: '1.1rem', color: '#4A4A4A', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+          <Icon name="Target" size={20} color="#87CEEB" /> Weekly Goal: {goal} Points
+        </h3>
+        <p style={{ margin: 0, color: '#888', fontSize: '0.85rem' }}>Reach {goal} points for a weekend reward!</p>
+      </div>
+      <div style={{ display: 'flex', justifyContent: 'center', gap: 40 }}>
+        {['Artin', 'Aiden'].map(name => {
+          const score = weeklyScores[name] || 0;
+          const pct = Math.max(0, Math.min(100, (score / goal) * 100));
+          return (
+            <div key={name} style={{ textAlign: 'center' }}>
+              <p style={{ margin: '0 0 6px', fontWeight: 600, color: '#4A4A4A' }}>{name}</p>
+              <div style={{ width: 140, height: 12, background: '#E5D4B7', borderRadius: 6, overflow: 'hidden' }}>
+                <div style={{ width: `${pct}%`, height: '100%', background: getColor(score), borderRadius: 6, transition: 'width 0.3s' }} />
+              </div>
+              <p style={{ margin: '6px 0 0', fontSize: '0.85rem', color: '#888' }}>{score}/{goal} {score >= goal && '🎉'}</p>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+// Main App
+function App() {
+  const [auth, setAuth] = useState(() => localStorage.getItem('bt_auth') === '1');
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [scores, setScores] = useState({ Artin: 0, Aiden: 0 });
+  const [weeklyScores, setWeeklyScores] = useState({ Artin: 0, Aiden: 0 });
+  const [history, setHistory] = useState({ Artin: [], Aiden: [] });
+  const [claimed, setClaimed] = useState({ Artin: [], Aiden: [] });
+  const [view, setView] = useState('home');
+  const [selectedChild, setSelectedChild] = useState('Artin');
+  const [historyView, setHistoryView] = useState('daily');
+
+  useEffect(() => { if (auth) loadData(); }, [auth]);
+
+  const loadData = async () => {
+    setLoading(true);
+    try {
+      const data = await api.getData();
+      if (data) {
+        setScores(data.scores || { Artin: 0, Aiden: 0 });
+        setWeeklyScores(data.weeklyScores || { Artin: 0, Aiden: 0 });
+        setHistory(data.history || { Artin: [], Aiden: [] });
+        setClaimed(data.claimed || { Artin: [], Aiden: [] });
+      }
+    } catch (e) { console.error(e); }
+    setLoading(false);
+  };
+
+  useEffect(() => {
+    if (auth && !loading) {
+      localStorage.setItem('bt_data_v4', JSON.stringify({ scores, weeklyScores, history, claimed }));
+    }
+  }, [scores, weeklyScores, history, claimed, auth, loading]);
+
+  const record = async (child, behavior) => {
+    setSaving(true);
+    const entry = { ...behavior, timestamp: new Date().toISOString(), date: today() };
+    setScores(s => ({ ...s, [child]: s[child] + behavior.points }));
+    setWeeklyScores(s => ({ ...s, [child]: s[child] + behavior.points }));
+    setHistory(h => ({ ...h, [child]: [entry, ...h[child]] }));
+    try { await api.recordBehavior(child, behavior); } catch (e) { console.error(e); }
+    setSaving(false);
+  };
+
+  const undo = async (child) => {
+    if (!history[child]?.length) return;
+    setSaving(true);
+    const last = history[child][0];
+    setScores(s => ({ ...s, [child]: s[child] - last.points }));
+    setWeeklyScores(s => ({ ...s, [child]: s[child] - last.points }));
+    setHistory(h => ({ ...h, [child]: h[child].slice(1) }));
+    try { await api.undoLast(child); } catch (e) { console.error(e); }
+    setSaving(false);
+  };
+
+  const claim = async (child, reward) => {
+    if ((claimed[child] || []).includes(reward.id)) return;
+    setClaimed(c => ({ ...c, [child]: [...(c[child] || []), reward.id] }));
+    try { await api.claimReward(child, reward); } catch (e) { console.error(e); }
+  };
+
+  const reset = async () => {
+    if (!confirm('Reset all data? This cannot be undone.')) return;
+    setScores({ Artin: 0, Aiden: 0 });
+    setWeeklyScores({ Artin: 0, Aiden: 0 });
+    setHistory({ Artin: [], Aiden: [] });
+    setClaimed({ Artin: [], Aiden: [] });
+    try { await api.resetAll(); } catch (e) { console.error(e); }
+  };
+
+  const logout = () => { localStorage.removeItem('bt_auth'); setAuth(false); };
+
+  if (!auth) return <PasswordScreen onUnlock={() => setAuth(true)} />;
+  
+  if (loading) return (
+    <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      <div style={{ textAlign: 'center' }}>
+        <span className="spin" style={{ display: 'inline-block' }}><Icon name="Loader2" size={48} color="#C9A882" /></span>
+        <p style={{ marginTop: 16, color: '#888' }}>Loading...</p>
+      </div>
+    </div>
+  );
+
+  return (
+    <div style={{ minHeight: '100vh', paddingBottom: 80 }}>
+      {/* Header */}
+      <header style={{ background: 'linear-gradient(135deg, #4F7942 0%, #6B8E4E 100%)', padding: '16px 20px', color: 'white', textAlign: 'center' }}>
+        <h1 style={{ margin: 0, fontSize: '1.4rem' }}>Artin & Aiden</h1>
+        <p style={{ margin: '4px 0 0', fontSize: '0.85rem', opacity: 0.9 }}>Behavior Tracker</p>
+        {saving && <div style={{ marginTop: 6, fontSize: '0.8rem', opacity: 0.9 }}>💾 Saving...</div>}
+      </header>
+
+      {/* Nav */}
+      <nav style={{ display: 'flex', justifyContent: 'center', gap: 6, padding: '12px', background: 'white', borderBottom: '1px solid #E5D4B7', position: 'sticky', top: 0, zIndex: 100, flexWrap: 'wrap' }}>
+        {[['Home', 'home', 'Home', '#4F7942'], ['BarChart3', 'history', 'History', '#87CEEB'], ['Gift', 'rewards', 'Rewards', '#C9A882']].map(([icon, v, label, color]) => (
+          <button key={v} onClick={() => setView(v)} style={{ padding: '8px 14px', borderRadius: 10, border: view === v ? 'none' : '1px solid #D4B996', background: view === v ? color : 'white', color: view === v ? 'white' : '#4A4A4A', fontSize: '0.85rem', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}>
+            <Icon name={icon} size={16} color={view === v ? 'white' : color} /> {label}
+          </button>
+        ))}
+        <button onClick={reset} style={{ padding: '8px 14px', borderRadius: 10, border: '1px solid #D4B996', background: 'white', color: '#B85C38', fontSize: '0.85rem', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}>
+          <Icon name="RotateCcw" size={16} color="#B85C38" /> Reset
+        </button>
+        <button onClick={logout} style={{ padding: '8px 14px', borderRadius: 10, border: '1px solid #D4B996', background: 'white', color: '#888', fontSize: '0.85rem', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}>
+          <Icon name="LogOut" size={16} color="#888" /> Lock
+        </button>
+      </nav>
+
+      {/* Content */}
+      <main style={{ padding: 16, maxWidth: 1200, margin: '0 auto' }}>
+        {view === 'home' && (
+          <>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(340px, 1fr))', gap: 20, marginBottom: 20 }}>
+              {['Artin', 'Aiden'].map(name => (
+                <ScoreCard key={name} name={name} scores={scores} weeklyScores={weeklyScores} history={history} claimed={claimed} onRecord={record} onUndo={undo} loading={saving} />
+              ))}
+            </div>
+            <WeeklyProgress weeklyScores={weeklyScores} />
+          </>
+        )}
+        {view === 'history' && <HistoryPanel history={history} selectedChild={selectedChild} setSelectedChild={setSelectedChild} historyView={historyView} setHistoryView={setHistoryView} />}
+        {view === 'rewards' && <RewardsPanel scores={scores} claimed={claimed} onClaim={claim} />}
+      </main>
+
+      {/* Footer */}
+      <footer style={{ textAlign: 'center', padding: 16, color: '#888', fontSize: '0.8rem' }}>
+        ☁️ Synced with Google Sheets
+      </footer>
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+  </script>
+</body>
+</html>

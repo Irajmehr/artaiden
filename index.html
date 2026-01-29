@@ -19,7 +19,6 @@
       --sand-lighter: #E5D4B7;
       --sand-warm: #A8916B;
       --sky-blue: #87CEEB;
-      --sky-soft: #B8D4E8;
       --fern-green: #4F7942;
       --sage-green: #6B8E4E;
       --slate: #4A4A4A;
@@ -38,11 +37,18 @@
     ::-webkit-scrollbar { width: 6px; }
     ::-webkit-scrollbar-track { background: var(--sand-lighter); border-radius: 3px; }
     ::-webkit-scrollbar-thumb { background: var(--sand-warm); border-radius: 3px; }
-    @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+    @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
     @keyframes spin { to { transform: rotate(360deg); } }
+    @keyframes pulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.1); } }
     .fade-in { animation: fadeIn 0.3s ease-out; }
     .spin { animation: spin 1s linear infinite; }
+    .pulse { animation: pulse 0.3s ease-out; }
     .btn-bounce:active { transform: scale(0.92); }
+    @media (max-width: 1024px) {
+      .three-panel { flex-direction: column !important; }
+      .side-panel { min-width: 100% !important; max-width: 100% !important; }
+      .center-panel { order: -1 !important; }
+    }
     @media (max-width: 768px) { html { font-size: 14px; } }
   </style>
 </head>
@@ -54,7 +60,7 @@ const { useState, useEffect, useRef } = React;
 const GOOGLE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxuEp2AwHSV3rN7D1Je1btpdtG1quMi6aaazCqqSxUJUq1rOfWzkXVb81Y2wnMQaC5O/exec';
 const PASSWORD = 'artaiden';
 
-// Icons Component
+// Icon Component
 const Icon = ({ name, size = 20, color = 'currentColor' }) => {
   const ref = useRef(null);
   useEffect(() => {
@@ -71,12 +77,10 @@ const Icon = ({ name, size = 20, color = 'currentColor' }) => {
   return <span ref={ref} style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }} />;
 };
 
-// ============ ALL BEHAVIORS BY CATEGORY ============
+// Behaviors by Category
 const behaviorsByCategory = {
   'Punctuality': {
-    icon: 'Clock',
-    color: '#B8D4E8',
-    textColor: '#2C3E50',
+    icon: 'Clock', color: '#B8D4E8', textColor: '#2C3E50',
     items: [
       { id: 'wake', label: 'Waking up on time', posLabel: 'Woke up on time', negLabel: 'Woke up late', points: 10, icon: 'Sunrise' },
       { id: 'school-ready', label: 'Ready for school', posLabel: 'Ready on time', negLabel: 'Late for school', points: 10, icon: 'Backpack' },
@@ -85,60 +89,48 @@ const behaviorsByCategory = {
     ]
   },
   'Eating': {
-    icon: 'Utensils',
-    color: '#C9E4CA',
-    textColor: '#2D5A2E',
+    icon: 'Utensils', color: '#C9E4CA', textColor: '#2D5A2E',
     items: [
       { id: 'breakfast', label: 'Eating breakfast', posLabel: 'Ate breakfast', negLabel: 'Skipped breakfast', points: 10, icon: 'Coffee' },
-      { id: 'lunch-school', label: 'Eating lunch at school', posLabel: 'Ate school lunch', negLabel: 'Skipped school lunch', points: 10, icon: 'Sandwich' },
-      { id: 'snacks-school', label: 'Eating school snacks', posLabel: 'Ate school snacks', negLabel: 'Skipped school snacks', points: 5, icon: 'Cookie' },
+      { id: 'lunch-school', label: 'Lunch at school', posLabel: 'Ate school lunch', negLabel: 'Skipped school lunch', points: 10, icon: 'Sandwich' },
+      { id: 'snacks-school', label: 'School snacks', posLabel: 'Ate school snacks', negLabel: 'Skipped school snacks', points: 5, icon: 'Cookie' },
       { id: 'vegetables', label: 'Eating vegetables', posLabel: 'Ate vegetables', negLabel: 'Refused vegetables', points: 15, icon: 'Salad' },
       { id: 'fruits', label: 'Eating fruits', posLabel: 'Ate fruits', negLabel: 'Refused fruits', points: 10, icon: 'Apple' },
-      { id: 'finish-meal', label: 'Finishing meal', posLabel: 'Finished meal', negLabel: 'Did not finish meal', points: 10, icon: 'UtensilsCrossed' },
-      { id: 'picky', label: 'Picky eating', posLabel: 'Not picky today', negLabel: 'Was picky', points: 5, icon: 'ThumbsDown' },
+      { id: 'finish-meal', label: 'Finishing meal', posLabel: 'Finished meal', negLabel: 'Did not finish', points: 10, icon: 'UtensilsCrossed' },
     ]
   },
   'Learning': {
-    icon: 'GraduationCap',
-    color: '#E8D4B8',
-    textColor: '#5A4A2D',
+    icon: 'GraduationCap', color: '#E8D4B8', textColor: '#5A4A2D',
     items: [
-      { id: 'homework', label: 'Completing homework', posLabel: 'Completed homework', negLabel: 'Did not complete homework', points: 15, icon: 'BookOpen' },
-      { id: 'reading', label: 'Reading books (20 min)', posLabel: 'Read 20 minutes', negLabel: 'Did not read', points: 15, icon: 'BookMarked' },
-      { id: 'book-chapter', label: 'Finishing book chapter', posLabel: 'Finished chapter', negLabel: 'Did not finish chapter', points: 20, icon: 'BookCheck' },
+      { id: 'homework', label: 'Completing homework', posLabel: 'Completed homework', negLabel: 'Incomplete homework', points: 15, icon: 'BookOpen' },
+      { id: 'reading', label: 'Reading (20 min)', posLabel: 'Read 20 minutes', negLabel: 'Did not read', points: 15, icon: 'BookMarked' },
+      { id: 'book-chapter', label: 'Finish book chapter', posLabel: 'Finished chapter', negLabel: 'Did not finish', points: 20, icon: 'BookCheck' },
     ]
   },
   'Character': {
-    icon: 'Heart',
-    color: '#E8B8D4',
-    textColor: '#5A2D4A',
+    icon: 'Heart', color: '#E8B8D4', textColor: '#5A2D4A',
     items: [
-      { id: 'kind-words', label: 'Using kind words', posLabel: 'Used kind words', negLabel: 'Used unkind words', points: 5, icon: 'MessageCircleHeart' },
-      { id: 'sharing', label: 'Sharing with sibling', posLabel: 'Shared nicely', negLabel: 'Did not share', points: 10, icon: 'Users' },
-      { id: 'manners', label: 'Using good manners', posLabel: 'Good manners', negLabel: 'Bad manners', points: 5, icon: 'Sparkles' },
-      { id: 'helping', label: 'Helping without asking', posLabel: 'Helped voluntarily', negLabel: 'Refused to help', points: 15, icon: 'HandHelping' },
-      { id: 'fighting', label: 'Fighting with sibling', posLabel: 'No fighting today', negLabel: 'Fought with sibling', points: 10, icon: 'Swords' },
-      { id: 'talking-back', label: 'Talking back', posLabel: 'Respectful today', negLabel: 'Talked back', points: 10, icon: 'MessageSquareWarning' },
-      { id: 'curse', label: 'Curse words', posLabel: 'No bad words', negLabel: 'Used curse words', points: 10, icon: 'MessageSquareOff' },
+      { id: 'kind-words', label: 'Kind words', posLabel: 'Used kind words', negLabel: 'Unkind words', points: 5, icon: 'MessageCircleHeart' },
+      { id: 'sharing', label: 'Sharing', posLabel: 'Shared nicely', negLabel: 'Did not share', points: 10, icon: 'Users' },
+      { id: 'manners', label: 'Good manners', posLabel: 'Good manners', negLabel: 'Bad manners', points: 5, icon: 'Sparkles' },
+      { id: 'helping', label: 'Helping', posLabel: 'Helped voluntarily', negLabel: 'Refused to help', points: 15, icon: 'HandHelping' },
+      { id: 'no-fighting', label: 'No fighting', posLabel: 'No fighting today', negLabel: 'Fought with sibling', points: 10, icon: 'Swords' },
+      { id: 'respect', label: 'Being respectful', posLabel: 'Was respectful', negLabel: 'Talked back', points: 10, icon: 'MessageSquare' },
     ]
   },
   'Responsibility': {
-    icon: 'CheckSquare',
-    color: '#D4B8E8',
-    textColor: '#4A2D5A',
+    icon: 'CheckSquare', color: '#D4B8E8', textColor: '#4A2D5A',
     items: [
-      { id: 'chores', label: 'Completing chores', posLabel: 'Did chores', negLabel: 'Did not do chores', points: 10, icon: 'Brush' },
-      { id: 'basketball', label: 'Basketball practice', posLabel: 'Attended basketball', negLabel: 'Skipped basketball', points: 15, icon: 'Dribbble' },
-      { id: 'clean-room', label: 'Cleaning room', posLabel: 'Cleaned room', negLabel: 'Did not clean room', points: 10, icon: 'Home' },
+      { id: 'chores', label: 'Doing chores', posLabel: 'Did chores', negLabel: 'Skipped chores', points: 10, icon: 'Brush' },
+      { id: 'basketball', label: 'Basketball', posLabel: 'Attended basketball', negLabel: 'Skipped basketball', points: 15, icon: 'Dribbble' },
+      { id: 'clean-room', label: 'Clean room', posLabel: 'Cleaned room', negLabel: 'Messy room', points: 10, icon: 'Home' },
     ]
   },
   'Screen Time': {
-    icon: 'Smartphone',
-    color: '#FFE4E4',
-    textColor: '#8B3A3A',
+    icon: 'Smartphone', color: '#FFE4E4', textColor: '#8B3A3A',
     items: [
-      { id: 'youtube', label: 'YouTube shorts', posLabel: 'No YouTube shorts', negLabel: 'Watched YouTube shorts', points: 5, icon: 'Youtube' },
-      { id: 'screen-limit', label: 'Screen time limit', posLabel: 'Stayed within limit', negLabel: 'Exceeded screen time', points: 10, icon: 'MonitorOff' },
+      { id: 'no-youtube', label: 'No YouTube shorts', posLabel: 'No YouTube shorts', negLabel: 'Watched YouTube shorts', points: 5, icon: 'Youtube' },
+      { id: 'screen-limit', label: 'Screen limit', posLabel: 'Within screen limit', negLabel: 'Exceeded screen time', points: 10, icon: 'MonitorOff' },
     ]
   }
 };
@@ -149,27 +141,30 @@ const rewards = [
   { id: 'game30', points: 35, label: '30 min Game Time', icon: 'Gamepad' },
   { id: 'snack', points: 40, label: 'Special Snack', icon: 'Popcorn' },
   { id: 'movie', points: 50, label: 'Movie Night', icon: 'Film' },
-  { id: 'stayup', points: 60, label: 'Stay Up 30min Late', icon: 'MoonStar' },
-  { id: 'game60', points: 75, label: '1 Hour Game Time', icon: 'Trophy' },
-  { id: 'wish', points: 100, label: 'Free Wish Bonus', icon: 'Star' },
-  { id: 'boss', points: 150, label: 'Boss of Home (1hr)', icon: 'Crown' },
+  { id: 'stayup', points: 60, label: 'Stay Up Late', icon: 'MoonStar' },
+  { id: 'game60', points: 75, label: '1 Hour Game', icon: 'Trophy' },
+  { id: 'wish', points: 100, label: 'Free Wish', icon: 'Star' },
+  { id: 'boss', points: 150, label: 'Boss of Home', icon: 'Crown' },
   { id: 'outing', points: 200, label: 'Special Outing', icon: 'PartyPopper' },
 ];
 
 const restrictions = [
-  { threshold: 0, label: 'No Game Time', icon: 'Gamepad2' },
-  { threshold: -10, label: 'No TV Time', icon: 'Tv' },
+  { threshold: 0, label: 'No Games', icon: 'Gamepad2' },
+  { threshold: -10, label: 'No TV', icon: 'Tv' },
   { threshold: -20, label: 'No YouTube', icon: 'Youtube' },
-  { threshold: -30, label: 'Early Bedtime', icon: 'Moon' },
-  { threshold: -50, label: 'No Weekend Fun', icon: 'CalendarOff' },
+  { threshold: -30, label: 'Early Bed', icon: 'Moon' },
 ];
 
 // Utilities
 const getColor = s => s >= 100 ? '#4F7942' : s >= 50 ? '#6B8E4E' : s >= 20 ? '#87CEEB' : s >= 0 ? '#C9A882' : s >= -20 ? '#D4966B' : '#B85C38';
-const fmtDate = d => new Date(d).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
-const fmtTime = d => new Date(d).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
 const today = () => new Date().toISOString().split('T')[0];
+const formatDate = () => new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
 const weekStart = () => { const d = new Date(); d.setDate(d.getDate() - d.getDay()); return d.toISOString().split('T')[0]; };
+const getDayName = (offset) => {
+  const d = new Date();
+  d.setDate(d.getDate() - offset);
+  return d.toLocaleDateString('en-US', { weekday: 'short' });
+};
 
 // API
 const api = {
@@ -178,8 +173,8 @@ const api = {
       const res = await fetch(`${GOOGLE_SCRIPT_URL}?action=getData`);
       return res.json();
     } catch (e) {
-      const saved = localStorage.getItem('bt_data_v4');
-      return saved ? JSON.parse(saved) : { scores: { Artin: 0, Aiden: 0 }, weeklyScores: { Artin: 0, Aiden: 0 }, history: { Artin: [], Aiden: [] }, claimed: { Artin: [], Aiden: [] } };
+      const saved = localStorage.getItem('bt_data_v5');
+      return saved ? JSON.parse(saved) : null;
     }
   },
   async recordBehavior(child, behavior) {
@@ -190,12 +185,8 @@ const api = {
     try { return fetch(GOOGLE_SCRIPT_URL + '?action=undoLast', { method: 'POST', body: JSON.stringify({ child }) }).then(r => r.json()); }
     catch (e) { return { success: true }; }
   },
-  async claimReward(child, reward) {
-    try { return fetch(GOOGLE_SCRIPT_URL + '?action=claimReward', { method: 'POST', body: JSON.stringify({ child, reward }) }).then(r => r.json()); }
-    catch (e) { return { success: true }; }
-  },
-  async resetAll() {
-    try { return fetch(GOOGLE_SCRIPT_URL + '?action=resetAll', { method: 'POST' }).then(r => r.json()); }
+  async resetChild(child) {
+    try { return fetch(GOOGLE_SCRIPT_URL + '?action=resetChild', { method: 'POST', body: JSON.stringify({ child }) }).then(r => r.json()); }
     catch (e) { return { success: true }; }
   }
 };
@@ -223,106 +214,265 @@ function PasswordScreen({ onUnlock }) {
   );
 }
 
-// Behavior Row with +/- Buttons
-function BehaviorRow({ item, onAdd, onSubtract, loading }) {
+// Avatar Component
+function Avatar({ name, avatar, onUpload, size = 80 }) {
+  const inputRef = useRef(null);
+  
+  const handleUpload = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => onUpload(name, reader.result);
+      reader.readAsDataURL(file);
+    }
+  };
+
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 0', borderBottom: '1px solid #E5D4B7' }}>
+    <div style={{ position: 'relative', width: size, height: size, margin: '0 auto' }}>
+      <div 
+        onClick={() => inputRef.current?.click()}
+        style={{
+          width: size, height: size, borderRadius: '50%', overflow: 'hidden',
+          background: avatar ? 'none' : 'linear-gradient(135deg, #C9A882 0%, #A8916B 100%)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          cursor: 'pointer', border: '3px solid white', boxShadow: '0 4px 12px rgba(0,0,0,0.15)'
+        }}
+      >
+        {avatar ? (
+          <img src={avatar} alt={name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+        ) : (
+          <Icon name="User" size={size * 0.45} color="white" />
+        )}
+      </div>
+      <div style={{
+        position: 'absolute', bottom: 0, right: 0, width: 28, height: 28, borderRadius: '50%',
+        background: '#4F7942', display: 'flex', alignItems: 'center', justifyContent: 'center',
+        border: '2px solid white', cursor: 'pointer'
+      }} onClick={() => inputRef.current?.click()}>
+        <Icon name="Camera" size={14} color="white" />
+      </div>
+      <input ref={inputRef} type="file" accept="image/*" onChange={handleUpload} style={{ display: 'none' }} />
+    </div>
+  );
+}
+
+// Behavior Row with Daily State
+function BehaviorRow({ item, dailyState, onAdd, onSubtract, loading }) {
+  const state = dailyState || null; // 'positive', 'negative', or null
+  
+  return (
+    <div style={{ 
+      display: 'flex', alignItems: 'center', gap: 8, padding: '8px 4px', 
+      borderBottom: '1px solid #E5D4B7',
+      background: state === 'positive' ? '#F0FDF4' : state === 'negative' ? '#FEF2F2' : 'transparent',
+      borderRadius: state ? 8 : 0,
+      marginBottom: 2
+    }}>
       {/* Minus Button */}
-      <button onClick={() => onSubtract(item)} disabled={loading} className="btn-bounce" style={{
-        width: 44, height: 44, borderRadius: 12, border: 'none',
-        background: 'linear-gradient(135deg, #B85C38 0%, #D4714D 100%)',
-        color: 'white', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
-        boxShadow: '0 3px 10px rgba(184,92,56,0.3)', flexShrink: 0, transition: 'transform 0.1s'
-      }}>
-        <Icon name="Minus" size={22} color="white" />
+      <button 
+        onClick={() => onSubtract(item)} 
+        disabled={loading || state === 'negative'}
+        className="btn-bounce" 
+        style={{
+          width: 36, height: 36, borderRadius: 10, border: 'none',
+          background: state === 'negative' ? '#B85C38' : 'linear-gradient(135deg, #B85C38 0%, #D4714D 100%)',
+          color: 'white', cursor: loading || state === 'negative' ? 'default' : 'pointer',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          opacity: state === 'negative' ? 1 : state === 'positive' ? 0.4 : 1,
+          boxShadow: state === 'negative' ? 'none' : '0 2px 8px rgba(184,92,56,0.25)',
+          flexShrink: 0, transition: 'all 0.15s'
+        }}
+      >
+        {state === 'negative' ? <Icon name="Check" size={18} color="white" /> : <Icon name="Minus" size={18} color="white" />}
       </button>
 
       {/* Label */}
-      <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
-        <div style={{ width: 38, height: 38, borderRadius: 10, background: '#F5F0EB', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-          <Icon name={item.icon} size={20} color="#A8916B" />
+      <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
+        <div style={{ 
+          width: 32, height: 32, borderRadius: 8, 
+          background: state === 'positive' ? '#4F7942' : state === 'negative' ? '#B85C38' : '#F5F0EB',
+          display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 
+        }}>
+          <Icon name={item.icon} size={16} color={state ? 'white' : '#A8916B'} />
         </div>
         <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontWeight: 600, color: '#4A4A4A', fontSize: '0.95rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{item.label}</div>
-          <div style={{ fontSize: '0.75rem', color: '#888' }}>±{item.points} pts</div>
+          <div style={{ 
+            fontWeight: 600, color: state === 'positive' ? '#4F7942' : state === 'negative' ? '#B85C38' : '#4A4A4A', 
+            fontSize: '0.85rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' 
+          }}>
+            {state === 'positive' ? item.posLabel : state === 'negative' ? item.negLabel : item.label}
+          </div>
+          <div style={{ fontSize: '0.7rem', color: '#888' }}>±{item.points} pts</div>
         </div>
       </div>
 
       {/* Plus Button */}
-      <button onClick={() => onAdd(item)} disabled={loading} className="btn-bounce" style={{
-        width: 44, height: 44, borderRadius: 12, border: 'none',
-        background: 'linear-gradient(135deg, #4F7942 0%, #6B8E4E 100%)',
-        color: 'white', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
-        boxShadow: '0 3px 10px rgba(79,121,66,0.3)', flexShrink: 0, transition: 'transform 0.1s'
-      }}>
-        <Icon name="Plus" size={22} color="white" />
+      <button 
+        onClick={() => onAdd(item)} 
+        disabled={loading || state === 'positive'}
+        className="btn-bounce" 
+        style={{
+          width: 36, height: 36, borderRadius: 10, border: 'none',
+          background: state === 'positive' ? '#4F7942' : 'linear-gradient(135deg, #4F7942 0%, #6B8E4E 100%)',
+          color: 'white', cursor: loading || state === 'positive' ? 'default' : 'pointer',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          opacity: state === 'positive' ? 1 : state === 'negative' ? 0.4 : 1,
+          boxShadow: state === 'positive' ? 'none' : '0 2px 8px rgba(79,121,66,0.25)',
+          flexShrink: 0, transition: 'all 0.15s'
+        }}
+      >
+        {state === 'positive' ? <Icon name="Check" size={18} color="white" /> : <Icon name="Plus" size={18} color="white" />}
       </button>
     </div>
   );
 }
 
-// Child Score Card
-function ScoreCard({ name, scores, weeklyScores, history, claimed, onRecord, onUndo, loading }) {
+// Weekly Chart
+function WeeklyChart({ history, name }) {
+  const days = [];
+  for (let i = 6; i >= 0; i--) {
+    const d = new Date();
+    d.setDate(d.getDate() - i);
+    const dateStr = d.toISOString().split('T')[0];
+    const dayHistory = (history[name] || []).filter(h => h.date === dateStr);
+    const points = dayHistory.reduce((sum, h) => sum + h.points, 0);
+    days.push({ day: d.toLocaleDateString('en-US', { weekday: 'short' }), points, isToday: i === 0 });
+  }
+  
+  const maxAbs = Math.max(50, ...days.map(d => Math.abs(d.points)));
+  
+  return (
+    <div style={{ padding: 16 }}>
+      <h4 style={{ margin: '0 0 12px', fontSize: '0.9rem', color: '#4A4A4A', textAlign: 'center' }}>{name}'s Week</h4>
+      <div style={{ display: 'flex', alignItems: 'end', justifyContent: 'space-between', height: 100, gap: 4 }}>
+        {days.map((d, i) => (
+          <div key={i} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', flex: 1 }}>
+            <div style={{ 
+              width: '100%', maxWidth: 30, 
+              height: Math.abs(d.points) / maxAbs * 60,
+              background: d.points >= 0 ? '#4F7942' : '#B85C38',
+              borderRadius: 4,
+              marginBottom: 4,
+              opacity: d.isToday ? 1 : 0.7
+            }} />
+            <span style={{ fontSize: '0.65rem', color: d.isToday ? '#4A4A4A' : '#888', fontWeight: d.isToday ? 600 : 400 }}>{d.day}</span>
+            <span style={{ fontSize: '0.6rem', color: d.points >= 0 ? '#4F7942' : '#B85C38' }}>{d.points >= 0 ? '+' : ''}{d.points}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// Score Summary Chart
+function ScoreSummary({ scores, weeklyScores }) {
+  return (
+    <div style={{ padding: 16, background: '#F9F6F2', borderRadius: 12, marginBottom: 16 }}>
+      <h4 style={{ margin: '0 0 16px', fontSize: '1rem', color: '#4A4A4A', textAlign: 'center' }}>Score Comparison</h4>
+      <div style={{ display: 'flex', justifyContent: 'space-around' }}>
+        {['Artin', 'Aiden'].map(name => (
+          <div key={name} style={{ textAlign: 'center' }}>
+            <div style={{ fontSize: '2rem', fontWeight: 700, color: getColor(scores[name] || 0) }}>{scores[name] || 0}</div>
+            <div style={{ fontSize: '0.8rem', color: '#888' }}>{name}</div>
+            <div style={{ fontSize: '0.7rem', color: '#aaa', marginTop: 4 }}>Week: {weeklyScores[name] || 0}</div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// Category Progress
+function CategoryProgress({ history, name }) {
+  const todayStr = today();
+  const todayHistory = (history[name] || []).filter(h => h.date === todayStr);
+  
+  const catStats = Object.entries(behaviorsByCategory).map(([catName, cat]) => {
+    const total = cat.items.length;
+    const completed = cat.items.filter(item => 
+      todayHistory.some(h => h.id === item.id + '-pos' || h.id === item.id + '-neg')
+    ).length;
+    const positive = cat.items.filter(item => 
+      todayHistory.some(h => h.id === item.id + '-pos')
+    ).length;
+    return { name: catName, total, completed, positive, color: cat.color, textColor: cat.textColor };
+  });
+
+  return (
+    <div style={{ padding: 16 }}>
+      <h4 style={{ margin: '0 0 12px', fontSize: '0.9rem', color: '#4A4A4A', textAlign: 'center' }}>{name}'s Today</h4>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+        {catStats.map(cat => (
+          <div key={cat.name} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <span style={{ fontSize: '0.7rem', color: '#888', width: 70, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{cat.name}</span>
+            <div style={{ flex: 1, height: 8, background: '#E5D4B7', borderRadius: 4, overflow: 'hidden' }}>
+              <div style={{ width: `${(cat.positive / cat.total) * 100}%`, height: '100%', background: '#4F7942', borderRadius: 4 }} />
+            </div>
+            <span style={{ fontSize: '0.65rem', color: '#888', width: 30 }}>{cat.positive}/{cat.total}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// Child Panel
+function ChildPanel({ name, scores, weeklyScores, history, dailyStates, avatar, onRecord, onUndo, onReset, onAvatarUpload, loading, side }) {
   const score = scores[name] || 0;
   const weeklyScore = weeklyScores[name] || 0;
   const childHistory = history[name] || [];
+  const childDailyState = dailyStates[name] || {};
   const activeRestrictions = restrictions.filter(r => score <= r.threshold);
   const hasRestrictions = activeRestrictions.length > 0;
   const todayHistory = childHistory.filter(h => h.date === today());
   const todayPoints = todayHistory.reduce((sum, h) => sum + h.points, 0);
-  const [expandedCat, setExpandedCat] = useState(null);
+  const [expandedCat, setExpandedCat] = useState('Punctuality');
 
   const handleAdd = (item) => {
-    onRecord(name, { id: item.id + '-pos', label: item.posLabel, points: item.points, type: 'positive', icon: item.icon });
+    onRecord(name, { id: item.id + '-pos', label: item.posLabel, points: item.points, type: 'positive', behaviorId: item.id });
   };
 
   const handleSubtract = (item) => {
-    onRecord(name, { id: item.id + '-neg', label: item.negLabel, points: -item.points, type: 'negative', icon: item.icon });
+    onRecord(name, { id: item.id + '-neg', label: item.negLabel, points: -item.points, type: 'negative', behaviorId: item.id });
   };
 
   return (
-    <div className="fade-in" style={{ background: 'white', borderRadius: 20, boxShadow: '0 8px 32px rgba(74,74,74,0.1)', border: hasRestrictions ? '3px solid #B85C38' : '1px solid #E5D4B7', overflow: 'hidden' }}>
+    <div className="fade-in side-panel" style={{ 
+      background: 'white', borderRadius: 20, 
+      boxShadow: '0 8px 32px rgba(74,74,74,0.1)', 
+      border: hasRestrictions ? '3px solid #B85C38' : '1px solid #E5D4B7',
+      overflow: 'hidden', minWidth: 340, maxWidth: 400, flex: 1
+    }}>
       {/* Header */}
-      <div style={{ background: `linear-gradient(135deg, ${getColor(score)} 0%, ${getColor(score)}dd 100%)`, padding: 20, textAlign: 'center', color: 'white' }}>
-        <div style={{ width: 56, height: 56, borderRadius: '50%', background: 'rgba(255,255,255,0.25)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 10px' }}>
-          <Icon name="User" size={28} color="white" />
-        </div>
-        <h2 style={{ margin: '0 0 8px', fontSize: '1.5rem', fontWeight: 600 }}>{name}</h2>
-        <div style={{ fontSize: '2.5rem', fontWeight: 700 }}>{score}</div>
-        <div style={{ fontSize: '0.9rem', opacity: 0.9 }}>points</div>
-        <div style={{ marginTop: 10, display: 'flex', justifyContent: 'center', gap: 20, fontSize: '0.85rem' }}>
-          <span>Today: <strong>{todayPoints >= 0 ? '+' : ''}{todayPoints}</strong></span>
-          <span>Week: <strong>{weeklyScore >= 0 ? '+' : ''}{weeklyScore}</strong></span>
+      <div style={{ 
+        background: `linear-gradient(135deg, ${getColor(score)} 0%, ${getColor(score)}dd 100%)`, 
+        padding: '20px 16px', textAlign: 'center', color: 'white' 
+      }}>
+        <Avatar name={name} avatar={avatar} onUpload={onAvatarUpload} size={70} />
+        <h2 style={{ margin: '10px 0 4px', fontSize: '1.4rem', fontWeight: 600 }}>{name}</h2>
+        <div style={{ fontSize: '2.2rem', fontWeight: 700 }}>{score}</div>
+        <div style={{ fontSize: '0.85rem', opacity: 0.9 }}>points total</div>
+        <div style={{ marginTop: 8, display: 'flex', justifyContent: 'center', gap: 16, fontSize: '0.8rem' }}>
+          <span style={{ background: 'rgba(255,255,255,0.2)', padding: '4px 12px', borderRadius: 12 }}>
+            Today: <strong>{todayPoints >= 0 ? '+' : ''}{todayPoints}</strong>
+          </span>
+          <span style={{ background: 'rgba(255,255,255,0.2)', padding: '4px 12px', borderRadius: 12 }}>
+            Week: <strong>{weeklyScore >= 0 ? '+' : ''}{weeklyScore}</strong>
+          </span>
         </div>
       </div>
 
-      <div style={{ padding: 16 }}>
+      <div style={{ padding: 12 }}>
         {/* Restrictions */}
         {hasRestrictions && (
-          <div style={{ background: '#FEF2F2', border: '1px solid #FECACA', borderRadius: 10, padding: 12, marginBottom: 14 }}>
-            <div style={{ fontWeight: 600, color: '#B85C38', marginBottom: 6, fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: 6 }}>
-              <Icon name="AlertTriangle" size={16} color="#B85C38" /> Active Restrictions
+          <div style={{ background: '#FEF2F2', border: '1px solid #FECACA', borderRadius: 10, padding: 10, marginBottom: 12 }}>
+            <div style={{ fontWeight: 600, color: '#B85C38', marginBottom: 4, fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: 4 }}>
+              <Icon name="AlertTriangle" size={14} color="#B85C38" /> Restrictions Active
             </div>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
               {activeRestrictions.map(r => (
-                <span key={r.threshold} style={{ padding: '4px 10px', background: 'white', borderRadius: 6, color: '#B85C38', fontSize: '0.75rem', fontWeight: 500, display: 'flex', alignItems: 'center', gap: 4 }}>
-                  <Icon name={r.icon} size={12} color="#B85C38" /> {r.label}
-                </span>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* Rewards Available */}
-        {score >= 20 && !hasRestrictions && (
-          <div style={{ background: '#FEF7ED', border: '1px solid #FCD9B6', borderRadius: 10, padding: 12, marginBottom: 14 }}>
-            <div style={{ fontWeight: 600, color: '#92400E', marginBottom: 6, fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: 6 }}>
-              <Icon name="Gift" size={16} color="#C9A882" /> Rewards Available
-            </div>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-              {rewards.filter(r => score >= r.points && !(claimed[name] || []).includes(r.id)).slice(0, 3).map(r => (
-                <span key={r.id} style={{ padding: '4px 10px', background: 'white', borderRadius: 6, color: '#92400E', fontSize: '0.75rem', fontWeight: 500, display: 'flex', alignItems: 'center', gap: 4 }}>
-                  <Icon name={r.icon} size={12} color="#C9A882" /> {r.label}
+                <span key={r.threshold} style={{ padding: '3px 8px', background: 'white', borderRadius: 6, color: '#B85C38', fontSize: '0.7rem', fontWeight: 500 }}>
+                  {r.label}
                 </span>
               ))}
             </div>
@@ -330,172 +480,188 @@ function ScoreCard({ name, scores, weeklyScores, history, claimed, onRecord, onU
         )}
 
         {/* Categories */}
-        <div style={{ maxHeight: 450, overflowY: 'auto' }}>
-          {Object.entries(behaviorsByCategory).map(([catName, cat]) => (
-            <div key={catName} style={{ marginBottom: 12 }}>
-              <button 
-                onClick={() => setExpandedCat(expandedCat === catName ? null : catName)}
-                style={{ 
-                  width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                  padding: '10px 14px', background: cat.color, borderRadius: 10, border: 'none',
-                  cursor: 'pointer', marginBottom: expandedCat === catName ? 8 : 0
-                }}
-              >
-                <span style={{ display: 'flex', alignItems: 'center', gap: 8, fontWeight: 600, color: cat.textColor, fontSize: '0.9rem' }}>
-                  <Icon name={cat.icon} size={18} color={cat.textColor} />
-                  {catName}
-                  <span style={{ fontWeight: 400, fontSize: '0.8rem' }}>({cat.items.length})</span>
-                </span>
-                <Icon name={expandedCat === catName ? 'ChevronUp' : 'ChevronDown'} size={18} color={cat.textColor} />
-              </button>
-              
-              {expandedCat === catName && (
-                <div style={{ paddingLeft: 4, paddingRight: 4 }}>
-                  {cat.items.map(item => (
-                    <BehaviorRow key={item.id} item={item} onAdd={handleAdd} onSubtract={handleSubtract} loading={loading} />
-                  ))}
-                </div>
-              )}
-            </div>
-          ))}
-        </div>
-
-        {/* Undo */}
-        <button onClick={() => onUndo(name)} disabled={!childHistory.length || loading} style={{
-          width: '100%', marginTop: 12, padding: 12, borderRadius: 10,
-          border: '2px dashed #D4B996', background: childHistory.length ? 'white' : '#F5F5F5',
-          color: childHistory.length ? '#6B7280' : '#B0B0B0', cursor: childHistory.length ? 'pointer' : 'not-allowed',
-          fontSize: '0.9rem', fontWeight: 500, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8
-        }}>
-          <Icon name="Undo2" size={18} /> Undo Last ({childHistory.length})
-        </button>
-      </div>
-    </div>
-  );
-}
-
-// History Panel
-function HistoryPanel({ history, selectedChild, setSelectedChild, historyView, setHistoryView }) {
-  const childHistory = history[selectedChild] || [];
-  const groupByDate = arr => { const g = {}; arr.forEach(e => { if (!g[e.date]) g[e.date] = []; g[e.date].push(e); }); return g; };
-  const ws = weekStart();
-  const filtered = historyView === 'daily' ? childHistory.filter(h => h.date === today()) : childHistory.filter(h => h.date >= ws);
-  const grouped = groupByDate(filtered);
-  const dates = Object.keys(grouped).sort().reverse();
-
-  return (
-    <div className="fade-in" style={{ background: 'white', borderRadius: 20, padding: 20, boxShadow: '0 8px 32px rgba(74,74,74,0.1)', border: '1px solid #E5D4B7' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, flexWrap: 'wrap', gap: 10 }}>
-        <h3 style={{ margin: 0, fontSize: '1.2rem', color: '#4A4A4A', display: 'flex', alignItems: 'center', gap: 8 }}>
-          <Icon name="BarChart3" size={22} color="#C9A882" /> History
-        </h3>
-        <div style={{ display: 'flex', gap: 6 }}>
-          {['Artin', 'Aiden'].map(n => (
-            <button key={n} onClick={() => setSelectedChild(n)} style={{ padding: '6px 14px', borderRadius: 8, border: 'none', background: selectedChild === n ? '#4F7942' : '#E5D4B7', color: selectedChild === n ? 'white' : '#4A4A4A', fontWeight: 600, fontSize: '0.85rem', cursor: 'pointer' }}>{n}</button>
-          ))}
-        </div>
-      </div>
-
-      <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
-        {[['daily', 'Today'], ['weekly', 'This Week']].map(([v, label]) => (
-          <button key={v} onClick={() => setHistoryView(v)} style={{ flex: 1, padding: '10px', borderRadius: 10, border: historyView === v ? 'none' : '1px solid #D4B996', background: historyView === v ? '#87CEEB' : 'white', color: historyView === v ? '#2C3E50' : '#4A4A4A', fontWeight: 600, fontSize: '0.85rem', cursor: 'pointer' }}>{label}</button>
-        ))}
-      </div>
-
-      <div style={{ maxHeight: 400, overflowY: 'auto' }}>
-        {!dates.length ? (
-          <div style={{ textAlign: 'center', padding: 40, color: '#9CA3AF' }}>
-            <Icon name="Inbox" size={48} color="#D4B996" />
-            <p style={{ marginTop: 12 }}>No activity recorded</p>
-          </div>
-        ) : dates.map(d => (
-          <div key={d} style={{ marginBottom: 16 }}>
-            <div style={{ padding: '8px 12px', background: '#F9F6F2', borderRadius: 8, marginBottom: 8, display: 'flex', justifyContent: 'space-between', borderLeft: '4px solid #C9A882' }}>
-              <span style={{ fontWeight: 600, color: '#4A4A4A', fontSize: '0.9rem' }}>{fmtDate(d)}</span>
-              <span style={{ padding: '2px 10px', borderRadius: 12, background: grouped[d].reduce((s, e) => s + e.points, 0) >= 0 ? '#E8F5E9' : '#FFEBEE', color: grouped[d].reduce((s, e) => s + e.points, 0) >= 0 ? '#4F7942' : '#B85C38', fontWeight: 600, fontSize: '0.85rem' }}>{grouped[d].reduce((s, e) => s + e.points, 0) >= 0 ? '+' : ''}{grouped[d].reduce((s, e) => s + e.points, 0)}</span>
-            </div>
-            {grouped[d].map((e, i) => (
-              <div key={i} style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 12px', marginLeft: 8, borderRadius: 8, background: e.type === 'positive' ? '#F0FDF4' : '#FEF2F2', fontSize: '0.85rem', marginBottom: 4 }}>
-                <span style={{ color: e.type === 'positive' ? '#4F7942' : '#B85C38' }}>{e.label}</span>
-                <span style={{ color: '#888' }}>{e.points > 0 ? '+' : ''}{e.points} • {fmtTime(e.timestamp)}</span>
-              </div>
-            ))}
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-// Rewards Panel
-function RewardsPanel({ scores, claimed, onClaim }) {
-  return (
-    <div className="fade-in" style={{ background: 'white', borderRadius: 20, padding: 20, boxShadow: '0 8px 32px rgba(74,74,74,0.1)', border: '1px solid #E5D4B7' }}>
-      <h3 style={{ margin: '0 0 16px', fontSize: '1.2rem', color: '#4A4A4A', display: 'flex', alignItems: 'center', gap: 8 }}>
-        <Icon name="Gift" size={22} color="#C9A882" /> Rewards Shop
-      </h3>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 20 }}>
-        {['Artin', 'Aiden'].map(name => (
-          <div key={name}>
-            <div style={{ textAlign: 'center', padding: 14, background: `${getColor(scores[name] || 0)}20`, borderRadius: 12, marginBottom: 12, border: `2px solid ${getColor(scores[name] || 0)}` }}>
-              <h4 style={{ margin: '0 0 4px', fontSize: '1rem', color: '#4A4A4A' }}>{name}</h4>
-              <span style={{ fontSize: '1.4rem', fontWeight: 700, color: getColor(scores[name] || 0) }}>{scores[name] || 0} pts</span>
-            </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-              {rewards.map(r => {
-                const can = (scores[name] || 0) >= r.points;
-                const done = (claimed[name] || []).includes(r.id);
-                return (
-                  <div key={r.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 14px', borderRadius: 10, background: done ? '#E8F5E9' : can ? '#FEF7ED' : '#F5F5F5', border: `2px solid ${done ? '#4F7942' : can ? '#C9A882' : '#E5E5E5'}` }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                      <div style={{ width: 32, height: 32, borderRadius: 8, background: done ? '#4F7942' : can ? '#C9A882' : '#D4D4D4', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                        <Icon name={r.icon} size={16} color="white" />
-                      </div>
-                      <div>
-                        <div style={{ fontWeight: 600, color: '#4A4A4A', fontSize: '0.85rem' }}>{r.label}</div>
-                        <div style={{ color: '#888', fontSize: '0.75rem' }}>{r.points} pts</div>
-                      </div>
-                    </div>
-                    {done ? (
-                      <span style={{ color: '#4F7942', fontWeight: 600, fontSize: '0.8rem' }}>✓ Claimed</span>
-                    ) : can ? (
-                      <button onClick={() => onClaim(name, r)} style={{ padding: '6px 14px', borderRadius: 8, border: 'none', background: 'linear-gradient(135deg, #C9A882 0%, #A8916B 100%)', color: 'white', fontWeight: 600, fontSize: '0.8rem', cursor: 'pointer' }}>Claim</button>
-                    ) : (
-                      <span style={{ color: '#9CA3AF', fontSize: '0.8rem' }}>{r.points - (scores[name] || 0)} more</span>
-                    )}
+        <div style={{ maxHeight: 380, overflowY: 'auto' }}>
+          {Object.entries(behaviorsByCategory).map(([catName, cat]) => {
+            const completedCount = cat.items.filter(item => childDailyState[item.id]).length;
+            return (
+              <div key={catName} style={{ marginBottom: 8 }}>
+                <button 
+                  onClick={() => setExpandedCat(expandedCat === catName ? null : catName)}
+                  style={{ 
+                    width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                    padding: '8px 12px', background: cat.color, borderRadius: 8, border: 'none',
+                    cursor: 'pointer'
+                  }}
+                >
+                  <span style={{ display: 'flex', alignItems: 'center', gap: 6, fontWeight: 600, color: cat.textColor, fontSize: '0.85rem' }}>
+                    <Icon name={cat.icon} size={16} color={cat.textColor} />
+                    {catName}
+                  </span>
+                  <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <span style={{ fontSize: '0.75rem', color: cat.textColor, opacity: 0.8 }}>{completedCount}/{cat.items.length}</span>
+                    <Icon name={expandedCat === catName ? 'ChevronUp' : 'ChevronDown'} size={16} color={cat.textColor} />
+                  </span>
+                </button>
+                
+                {expandedCat === catName && (
+                  <div style={{ paddingTop: 6 }}>
+                    {cat.items.map(item => (
+                      <BehaviorRow 
+                        key={item.id} 
+                        item={item} 
+                        dailyState={childDailyState[item.id]}
+                        onAdd={handleAdd} 
+                        onSubtract={handleSubtract} 
+                        loading={loading} 
+                      />
+                    ))}
                   </div>
-                );
-              })}
-            </div>
-          </div>
-        ))}
+                )}
+              </div>
+            );
+          })}
+        </div>
+
+        {/* Actions */}
+        <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
+          <button onClick={() => onUndo(name)} disabled={!childHistory.length || loading} style={{
+            flex: 1, padding: 10, borderRadius: 10, border: '2px dashed #D4B996',
+            background: childHistory.length ? 'white' : '#F5F5F5',
+            color: childHistory.length ? '#6B7280' : '#B0B0B0',
+            cursor: childHistory.length ? 'pointer' : 'not-allowed',
+            fontSize: '0.8rem', fontWeight: 500, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6
+          }}>
+            <Icon name="Undo2" size={14} /> Undo
+          </button>
+          <button onClick={() => onReset(name)} style={{
+            flex: 1, padding: 10, borderRadius: 10, border: 'none',
+            background: '#FEF2F2', color: '#B85C38', fontSize: '0.8rem', fontWeight: 500,
+            cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6
+          }}>
+            <Icon name="RotateCcw" size={14} /> Reset {name}
+          </button>
+        </div>
       </div>
     </div>
   );
 }
 
-// Weekly Progress
-function WeeklyProgress({ weeklyScores }) {
-  const goal = 150;
+// Center Panel with Charts
+function CenterPanel({ scores, weeklyScores, history, claimed }) {
+  const [view, setView] = useState('charts');
+  
   return (
-    <div className="fade-in" style={{ background: 'white', borderRadius: 16, padding: 20, boxShadow: '0 8px 32px rgba(74,74,74,0.1)', border: '1px solid #E5D4B7' }}>
-      <div style={{ textAlign: 'center', marginBottom: 16 }}>
-        <h3 style={{ margin: '0 0 4px', fontSize: '1.1rem', color: '#4A4A4A', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
-          <Icon name="Target" size={20} color="#87CEEB" /> Weekly Goal: {goal} Points
-        </h3>
-        <p style={{ margin: 0, color: '#888', fontSize: '0.85rem' }}>Reach {goal} points for a weekend reward!</p>
+    <div className="fade-in center-panel" style={{ 
+      flex: 1, minWidth: 280, maxWidth: 400, display: 'flex', flexDirection: 'column', gap: 16 
+    }}>
+      {/* Date Header */}
+      <div style={{ 
+        background: 'white', borderRadius: 16, padding: 16, textAlign: 'center',
+        boxShadow: '0 4px 16px rgba(74,74,74,0.08)', border: '1px solid #E5D4B7'
+      }}>
+        <div style={{ fontSize: '0.8rem', color: '#888', marginBottom: 4 }}>Today is</div>
+        <div style={{ fontSize: '1.2rem', fontWeight: 600, color: '#4A4A4A' }}>{formatDate()}</div>
       </div>
-      <div style={{ display: 'flex', justifyContent: 'center', gap: 40 }}>
+
+      {/* Tabs */}
+      <div style={{ display: 'flex', gap: 8 }}>
+        {[['charts', 'BarChart3', 'Charts'], ['rewards', 'Gift', 'Rewards']].map(([v, icon, label]) => (
+          <button key={v} onClick={() => setView(v)} style={{
+            flex: 1, padding: '10px', borderRadius: 10,
+            border: view === v ? 'none' : '1px solid #D4B996',
+            background: view === v ? '#4F7942' : 'white',
+            color: view === v ? 'white' : '#4A4A4A',
+            fontSize: '0.85rem', fontWeight: 600, cursor: 'pointer',
+            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6
+          }}>
+            <Icon name={icon} size={16} color={view === v ? 'white' : '#4F7942'} /> {label}
+          </button>
+        ))}
+      </div>
+
+      {view === 'charts' && (
+        <div style={{ 
+          background: 'white', borderRadius: 16, overflow: 'hidden',
+          boxShadow: '0 4px 16px rgba(74,74,74,0.08)', border: '1px solid #E5D4B7'
+        }}>
+          <ScoreSummary scores={scores} weeklyScores={weeklyScores} />
+          <div style={{ borderTop: '1px solid #E5D4B7' }}>
+            <WeeklyChart history={history} name="Artin" />
+          </div>
+          <div style={{ borderTop: '1px solid #E5D4B7' }}>
+            <WeeklyChart history={history} name="Aiden" />
+          </div>
+          <div style={{ borderTop: '1px solid #E5D4B7' }}>
+            <CategoryProgress history={history} name="Artin" />
+          </div>
+          <div style={{ borderTop: '1px solid #E5D4B7' }}>
+            <CategoryProgress history={history} name="Aiden" />
+          </div>
+        </div>
+      )}
+
+      {view === 'rewards' && (
+        <div style={{ 
+          background: 'white', borderRadius: 16, padding: 16, overflow: 'hidden',
+          boxShadow: '0 4px 16px rgba(74,74,74,0.08)', border: '1px solid #E5D4B7',
+          maxHeight: 500, overflowY: 'auto'
+        }}>
+          {['Artin', 'Aiden'].map(name => (
+            <div key={name} style={{ marginBottom: 20 }}>
+              <h4 style={{ margin: '0 0 10px', fontSize: '1rem', color: '#4A4A4A' }}>{name}'s Rewards</h4>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                {rewards.map(r => {
+                  const can = (scores[name] || 0) >= r.points;
+                  const done = (claimed[name] || []).includes(r.id);
+                  return (
+                    <div key={r.id} style={{
+                      display: 'flex', alignItems: 'center', gap: 10, padding: '8px 10px', borderRadius: 8,
+                      background: done ? '#E8F5E9' : can ? '#FEF7ED' : '#F5F5F5',
+                      border: `1px solid ${done ? '#4F7942' : can ? '#C9A882' : '#E5E5E5'}`
+                    }}>
+                      <div style={{
+                        width: 28, height: 28, borderRadius: 6,
+                        background: done ? '#4F7942' : can ? '#C9A882' : '#D4D4D4',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center'
+                      }}>
+                        <Icon name={r.icon} size={14} color="white" />
+                      </div>
+                      <div style={{ flex: 1 }}>
+                        <div style={{ fontWeight: 600, color: '#4A4A4A', fontSize: '0.8rem' }}>{r.label}</div>
+                        <div style={{ fontSize: '0.7rem', color: '#888' }}>{r.points} pts</div>
+                      </div>
+                      {done && <Icon name="Check" size={16} color="#4F7942" />}
+                      {!done && can && <span style={{ fontSize: '0.7rem', color: '#C9A882', fontWeight: 600 }}>Available!</span>}
+                      {!done && !can && <span style={{ fontSize: '0.7rem', color: '#999' }}>{r.points - (scores[name] || 0)} more</span>}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Weekly Goal */}
+      <div style={{ 
+        background: 'white', borderRadius: 16, padding: 16,
+        boxShadow: '0 4px 16px rgba(74,74,74,0.08)', border: '1px solid #E5D4B7'
+      }}>
+        <h4 style={{ margin: '0 0 12px', fontSize: '0.9rem', color: '#4A4A4A', textAlign: 'center' }}>
+          Weekly Goal: 150 pts
+        </h4>
         {['Artin', 'Aiden'].map(name => {
           const score = weeklyScores[name] || 0;
-          const pct = Math.max(0, Math.min(100, (score / goal) * 100));
+          const pct = Math.min(100, (score / 150) * 100);
           return (
-            <div key={name} style={{ textAlign: 'center' }}>
-              <p style={{ margin: '0 0 6px', fontWeight: 600, color: '#4A4A4A' }}>{name}</p>
-              <div style={{ width: 140, height: 12, background: '#E5D4B7', borderRadius: 6, overflow: 'hidden' }}>
-                <div style={{ width: `${pct}%`, height: '100%', background: getColor(score), borderRadius: 6, transition: 'width 0.3s' }} />
+            <div key={name} style={{ marginBottom: 10 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
+                <span style={{ fontSize: '0.8rem', fontWeight: 600, color: '#4A4A4A' }}>{name}</span>
+                <span style={{ fontSize: '0.8rem', color: '#888' }}>{score}/150 {score >= 150 && '🎉'}</span>
               </div>
-              <p style={{ margin: '6px 0 0', fontSize: '0.85rem', color: '#888' }}>{score}/{goal} {score >= goal && '🎉'}</p>
+              <div style={{ height: 10, background: '#E5D4B7', borderRadius: 5, overflow: 'hidden' }}>
+                <div style={{ width: `${pct}%`, height: '100%', background: getColor(score), borderRadius: 5, transition: 'width 0.3s' }} />
+              </div>
             </div>
           );
         })}
@@ -513,14 +679,39 @@ function App() {
   const [weeklyScores, setWeeklyScores] = useState({ Artin: 0, Aiden: 0 });
   const [history, setHistory] = useState({ Artin: [], Aiden: [] });
   const [claimed, setClaimed] = useState({ Artin: [], Aiden: [] });
-  const [view, setView] = useState('home');
-  const [selectedChild, setSelectedChild] = useState('Artin');
-  const [historyView, setHistoryView] = useState('daily');
+  const [dailyStates, setDailyStates] = useState({ Artin: {}, Aiden: {} });
+  const [avatars, setAvatars] = useState({ Artin: null, Aiden: null });
+  const [lastDate, setLastDate] = useState(today());
 
   useEffect(() => { if (auth) loadData(); }, [auth]);
 
+  // Check for new day
+  useEffect(() => {
+    const checkDay = () => {
+      const currentDay = today();
+      if (currentDay !== lastDate) {
+        setDailyStates({ Artin: {}, Aiden: {} });
+        setLastDate(currentDay);
+      }
+    };
+    const interval = setInterval(checkDay, 60000);
+    return () => clearInterval(interval);
+  }, [lastDate]);
+
   const loadData = async () => {
     setLoading(true);
+    
+    // Load avatars from localStorage
+    const savedAvatars = localStorage.getItem('bt_avatars');
+    if (savedAvatars) setAvatars(JSON.parse(savedAvatars));
+    
+    // Load daily states
+    const savedStates = localStorage.getItem('bt_daily_states');
+    const savedDate = localStorage.getItem('bt_daily_date');
+    if (savedStates && savedDate === today()) {
+      setDailyStates(JSON.parse(savedStates));
+    }
+
     try {
       const data = await api.getData();
       if (data) {
@@ -529,22 +720,53 @@ function App() {
         setHistory(data.history || { Artin: [], Aiden: [] });
         setClaimed(data.claimed || { Artin: [], Aiden: [] });
       }
-    } catch (e) { console.error(e); }
+    } catch (e) { 
+      const saved = localStorage.getItem('bt_data_v5');
+      if (saved) {
+        const data = JSON.parse(saved);
+        setScores(data.scores || { Artin: 0, Aiden: 0 });
+        setWeeklyScores(data.weeklyScores || { Artin: 0, Aiden: 0 });
+        setHistory(data.history || { Artin: [], Aiden: [] });
+        setClaimed(data.claimed || { Artin: [], Aiden: [] });
+      }
+    }
     setLoading(false);
   };
 
+  // Save to localStorage
   useEffect(() => {
     if (auth && !loading) {
-      localStorage.setItem('bt_data_v4', JSON.stringify({ scores, weeklyScores, history, claimed }));
+      localStorage.setItem('bt_data_v5', JSON.stringify({ scores, weeklyScores, history, claimed }));
+      localStorage.setItem('bt_daily_states', JSON.stringify(dailyStates));
+      localStorage.setItem('bt_daily_date', today());
     }
-  }, [scores, weeklyScores, history, claimed, auth, loading]);
+  }, [scores, weeklyScores, history, claimed, dailyStates, auth, loading]);
+
+  const handleAvatarUpload = (name, dataUrl) => {
+    const newAvatars = { ...avatars, [name]: dataUrl };
+    setAvatars(newAvatars);
+    localStorage.setItem('bt_avatars', JSON.stringify(newAvatars));
+  };
 
   const record = async (child, behavior) => {
+    // Check if already recorded for today
+    const behaviorId = behavior.behaviorId;
+    if (dailyStates[child]?.[behaviorId]) {
+      // Already recorded, don't allow
+      return;
+    }
+
     setSaving(true);
     const entry = { ...behavior, timestamp: new Date().toISOString(), date: today() };
+    
     setScores(s => ({ ...s, [child]: s[child] + behavior.points }));
     setWeeklyScores(s => ({ ...s, [child]: s[child] + behavior.points }));
     setHistory(h => ({ ...h, [child]: [entry, ...h[child]] }));
+    setDailyStates(ds => ({
+      ...ds,
+      [child]: { ...ds[child], [behaviorId]: behavior.type }
+    }));
+
     try { await api.recordBehavior(child, behavior); } catch (e) { console.error(e); }
     setSaving(false);
   };
@@ -553,26 +775,34 @@ function App() {
     if (!history[child]?.length) return;
     setSaving(true);
     const last = history[child][0];
+    
     setScores(s => ({ ...s, [child]: s[child] - last.points }));
     setWeeklyScores(s => ({ ...s, [child]: s[child] - last.points }));
     setHistory(h => ({ ...h, [child]: h[child].slice(1) }));
+    
+    // Remove from daily states if it was today
+    if (last.date === today() && last.behaviorId) {
+      setDailyStates(ds => {
+        const newState = { ...ds[child] };
+        delete newState[last.behaviorId];
+        return { ...ds, [child]: newState };
+      });
+    }
+
     try { await api.undoLast(child); } catch (e) { console.error(e); }
     setSaving(false);
   };
 
-  const claim = async (child, reward) => {
-    if ((claimed[child] || []).includes(reward.id)) return;
-    setClaimed(c => ({ ...c, [child]: [...(c[child] || []), reward.id] }));
-    try { await api.claimReward(child, reward); } catch (e) { console.error(e); }
-  };
+  const resetChild = async (child) => {
+    if (!confirm(`Reset ${child}'s score and history? This cannot be undone.`)) return;
+    
+    setScores(s => ({ ...s, [child]: 0 }));
+    setWeeklyScores(s => ({ ...s, [child]: 0 }));
+    setHistory(h => ({ ...h, [child]: [] }));
+    setClaimed(c => ({ ...c, [child]: [] }));
+    setDailyStates(ds => ({ ...ds, [child]: {} }));
 
-  const reset = async () => {
-    if (!confirm('Reset all data? This cannot be undone.')) return;
-    setScores({ Artin: 0, Aiden: 0 });
-    setWeeklyScores({ Artin: 0, Aiden: 0 });
-    setHistory({ Artin: [], Aiden: [] });
-    setClaimed({ Artin: [], Aiden: [] });
-    try { await api.resetAll(); } catch (e) { console.error(e); }
+    try { await api.resetChild(child); } catch (e) { console.error(e); }
   };
 
   const logout = () => { localStorage.removeItem('bt_auth'); setAuth(false); };
@@ -589,43 +819,72 @@ function App() {
   );
 
   return (
-    <div style={{ minHeight: '100vh', paddingBottom: 80 }}>
+    <div style={{ minHeight: '100vh' }}>
       {/* Header */}
-      <header style={{ background: 'linear-gradient(135deg, #4F7942 0%, #6B8E4E 100%)', padding: '16px 20px', color: 'white', textAlign: 'center' }}>
-        <h1 style={{ margin: 0, fontSize: '1.4rem' }}>Artin & Aiden</h1>
-        <p style={{ margin: '4px 0 0', fontSize: '0.85rem', opacity: 0.9 }}>Behavior Tracker</p>
-        {saving && <div style={{ marginTop: 6, fontSize: '0.8rem', opacity: 0.9 }}>💾 Saving...</div>}
+      <header style={{ 
+        background: 'linear-gradient(135deg, #4F7942 0%, #6B8E4E 100%)', 
+        padding: '12px 20px', color: 'white', 
+        display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+        position: 'sticky', top: 0, zIndex: 100
+      }}>
+        <div>
+          <h1 style={{ margin: 0, fontSize: '1.3rem' }}>Behavior Tracker</h1>
+          {saving && <span style={{ fontSize: '0.75rem', opacity: 0.9 }}>💾 Saving...</span>}
+        </div>
+        <button onClick={logout} style={{
+          padding: '8px 14px', borderRadius: 8, border: 'none',
+          background: 'rgba(255,255,255,0.2)', color: 'white',
+          fontSize: '0.85rem', fontWeight: 500, cursor: 'pointer',
+          display: 'flex', alignItems: 'center', gap: 6
+        }}>
+          <Icon name="LogOut" size={16} color="white" /> Lock
+        </button>
       </header>
 
-      {/* Nav */}
-      <nav style={{ display: 'flex', justifyContent: 'center', gap: 6, padding: '12px', background: 'white', borderBottom: '1px solid #E5D4B7', position: 'sticky', top: 0, zIndex: 100, flexWrap: 'wrap' }}>
-        {[['Home', 'home', 'Home', '#4F7942'], ['BarChart3', 'history', 'History', '#87CEEB'], ['Gift', 'rewards', 'Rewards', '#C9A882']].map(([icon, v, label, color]) => (
-          <button key={v} onClick={() => setView(v)} style={{ padding: '8px 14px', borderRadius: 10, border: view === v ? 'none' : '1px solid #D4B996', background: view === v ? color : 'white', color: view === v ? 'white' : '#4A4A4A', fontSize: '0.85rem', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}>
-            <Icon name={icon} size={16} color={view === v ? 'white' : color} /> {label}
-          </button>
-        ))}
-        <button onClick={reset} style={{ padding: '8px 14px', borderRadius: 10, border: '1px solid #D4B996', background: 'white', color: '#B85C38', fontSize: '0.85rem', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}>
-          <Icon name="RotateCcw" size={16} color="#B85C38" /> Reset
-        </button>
-        <button onClick={logout} style={{ padding: '8px 14px', borderRadius: 10, border: '1px solid #D4B996', background: 'white', color: '#888', fontSize: '0.85rem', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}>
-          <Icon name="LogOut" size={16} color="#888" /> Lock
-        </button>
-      </nav>
+      {/* Main Content - 3 Panel Layout */}
+      <main className="three-panel" style={{ 
+        display: 'flex', gap: 20, padding: 20, maxWidth: 1400, margin: '0 auto',
+        alignItems: 'flex-start'
+      }}>
+        {/* Left Panel - Artin */}
+        <ChildPanel 
+          name="Artin" 
+          scores={scores} 
+          weeklyScores={weeklyScores}
+          history={history}
+          dailyStates={dailyStates}
+          avatar={avatars.Artin}
+          onRecord={record}
+          onUndo={undo}
+          onReset={resetChild}
+          onAvatarUpload={handleAvatarUpload}
+          loading={saving}
+          side="left"
+        />
 
-      {/* Content */}
-      <main style={{ padding: 16, maxWidth: 1200, margin: '0 auto' }}>
-        {view === 'home' && (
-          <>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(340px, 1fr))', gap: 20, marginBottom: 20 }}>
-              {['Artin', 'Aiden'].map(name => (
-                <ScoreCard key={name} name={name} scores={scores} weeklyScores={weeklyScores} history={history} claimed={claimed} onRecord={record} onUndo={undo} loading={saving} />
-              ))}
-            </div>
-            <WeeklyProgress weeklyScores={weeklyScores} />
-          </>
-        )}
-        {view === 'history' && <HistoryPanel history={history} selectedChild={selectedChild} setSelectedChild={setSelectedChild} historyView={historyView} setHistoryView={setHistoryView} />}
-        {view === 'rewards' && <RewardsPanel scores={scores} claimed={claimed} onClaim={claim} />}
+        {/* Center Panel - Charts */}
+        <CenterPanel 
+          scores={scores}
+          weeklyScores={weeklyScores}
+          history={history}
+          claimed={claimed}
+        />
+
+        {/* Right Panel - Aiden */}
+        <ChildPanel 
+          name="Aiden" 
+          scores={scores} 
+          weeklyScores={weeklyScores}
+          history={history}
+          dailyStates={dailyStates}
+          avatar={avatars.Aiden}
+          onRecord={record}
+          onUndo={undo}
+          onReset={resetChild}
+          onAvatarUpload={handleAvatarUpload}
+          loading={saving}
+          side="right"
+        />
       </main>
 
       {/* Footer */}
