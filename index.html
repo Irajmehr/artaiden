@@ -43,9 +43,7 @@
     .spin { animation: spin 1s linear infinite; }
     .btn-bounce:active { transform: scale(0.92); }
     
-    /* Mobile Navigation */
     .mobile-nav { display: none; }
-    .desktop-only { display: flex; }
     
     @media (max-width: 1024px) {
       .three-panel { flex-direction: column !important; align-items: center !important; }
@@ -81,9 +79,7 @@
         align-items: center;
         justify-content: center;
         gap: 6px;
-        transition: all 0.2s;
       }
-      .desktop-only { display: none !important; }
     }
     @media (max-width: 768px) { html { font-size: 14px; } }
   </style>
@@ -91,13 +87,12 @@
 <body>
   <div id="root"></div>
   <script type="text/babel">
-const { useState, useEffect, useRef } = React;
+const { useState, useEffect, useRef, useMemo } = React;
 
 const GOOGLE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxuEp2AwHSV3rN7D1Je1btpdtG1quMi6aaazCqqSxUJUq1rOfWzkXVb81Y2wnMQaC5O/exec';
 
-// Passwords
-const VIEWER_PASSWORD = 'artaiden';  // Kids - view only
-const ADMIN_PASSWORD = '8006005';     // Dad - full access
+const VIEWER_PASSWORD = 'artaiden';
+const ADMIN_PASSWORD = '8006005';
 
 // Icon Component
 const Icon = ({ name, size = 20, color = 'currentColor' }) => {
@@ -116,7 +111,7 @@ const Icon = ({ name, size = 20, color = 'currentColor' }) => {
   return <span ref={ref} style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }} />;
 };
 
-// Behaviors by Category
+// Behaviors
 const behaviorsByCategory = {
   'Punctuality': {
     icon: 'Clock', color: '#B8D4E8', textColor: '#2C3E50',
@@ -198,6 +193,60 @@ const restrictions = [
 const getColor = s => s >= 100 ? '#4F7942' : s >= 50 ? '#6B8E4E' : s >= 20 ? '#87CEEB' : s >= 0 ? '#C9A882' : s >= -20 ? '#D4966B' : '#B85C38';
 const today = () => new Date().toISOString().split('T')[0];
 const formatDate = () => new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
+const getWeekStart = () => {
+  const d = new Date();
+  d.setHours(0, 0, 0, 0);
+  d.setDate(d.getDate() - d.getDay());
+  return d.toISOString().split('T')[0];
+};
+
+// Calculate scores from history (single source of truth)
+const calculateScores = (history) => {
+  const scores = { Artin: 0, Aiden: 0 };
+  ['Artin', 'Aiden'].forEach(name => {
+    scores[name] = (history[name] || []).reduce((sum, h) => sum + h.points, 0);
+  });
+  return scores;
+};
+
+// Calculate weekly scores from history
+const calculateWeeklyScores = (history) => {
+  const weekStart = getWeekStart();
+  const scores = { Artin: 0, Aiden: 0 };
+  ['Artin', 'Aiden'].forEach(name => {
+    scores[name] = (history[name] || [])
+      .filter(h => h.date >= weekStart)
+      .reduce((sum, h) => sum + h.points, 0);
+  });
+  return scores;
+};
+
+// Calculate today's scores from history
+const calculateTodayScores = (history) => {
+  const todayStr = today();
+  const scores = { Artin: 0, Aiden: 0 };
+  ['Artin', 'Aiden'].forEach(name => {
+    scores[name] = (history[name] || [])
+      .filter(h => h.date === todayStr)
+      .reduce((sum, h) => sum + h.points, 0);
+  });
+  return scores;
+};
+
+// Build daily states from history
+const buildDailyStates = (history) => {
+  const todayStr = today();
+  const states = { Artin: {}, Aiden: {} };
+  ['Artin', 'Aiden'].forEach(name => {
+    const todayHistory = (history[name] || []).filter(h => h.date === todayStr);
+    todayHistory.forEach(h => {
+      if (h.behaviorId) {
+        states[name][h.behaviorId] = h.type;
+      }
+    });
+  });
+  return states;
+};
 
 // API
 const api = {
@@ -206,7 +255,7 @@ const api = {
       const res = await fetch(`${GOOGLE_SCRIPT_URL}?action=getData`);
       return res.json();
     } catch (e) {
-      const saved = localStorage.getItem('bt_data_v7');
+      const saved = localStorage.getItem('bt_data_v8');
       return saved ? JSON.parse(saved) : null;
     }
   },
@@ -252,17 +301,9 @@ function PasswordScreen({ onUnlock }) {
         <h1 style={{ margin: '0 0 6px', color: '#4A4A4A', fontSize: '1.75rem' }}>Behavior Tracker</h1>
         <p style={{ color: '#6B7280', marginBottom: 24 }}>Enter password to continue</p>
         <form onSubmit={submit}>
-          <input 
-            type="password" 
-            value={pw} 
-            onChange={e => setPw(e.target.value)} 
-            placeholder="Password" 
-            style={{ width: '100%', padding: '14px 18px', borderRadius: 10, border: `2px solid ${err ? '#B85C38' : '#E5D4B7'}`, fontSize: '1rem', marginBottom: 16, outline: 'none', background: '#FDFBF9' }} 
-          />
+          <input type="password" value={pw} onChange={e => setPw(e.target.value)} placeholder="Password" style={{ width: '100%', padding: '14px 18px', borderRadius: 10, border: `2px solid ${err ? '#B85C38' : '#E5D4B7'}`, fontSize: '1rem', marginBottom: 16, outline: 'none', background: '#FDFBF9' }} />
           {err && <p style={{ color: '#B85C38', marginBottom: 12, fontSize: '0.9rem' }}>Incorrect password</p>}
-          <button type="submit" style={{ width: '100%', padding: '14px', borderRadius: 10, border: 'none', background: 'linear-gradient(135deg, #4F7942 0%, #6B8E4E 100%)', color: 'white', fontSize: '1rem', fontWeight: 600, cursor: 'pointer' }}>
-            Enter
-          </button>
+          <button type="submit" style={{ width: '100%', padding: '14px', borderRadius: 10, border: 'none', background: 'linear-gradient(135deg, #4F7942 0%, #6B8E4E 100%)', color: 'white', fontSize: '1rem', fontWeight: 600, cursor: 'pointer' }}>Enter</button>
         </form>
         <div style={{ marginTop: 20, padding: 16, background: '#F9F6F2', borderRadius: 10, textAlign: 'left' }}>
           <p style={{ fontSize: '0.8rem', color: '#888', margin: 0 }}>
@@ -275,10 +316,9 @@ function PasswordScreen({ onUnlock }) {
   );
 }
 
-// Avatar Component
+// Avatar
 function Avatar({ name, avatar, onUpload, size = 80, isAdmin }) {
   const inputRef = useRef(null);
-  
   const handleUpload = (e) => {
     if (!isAdmin) return;
     const file = e.target.files[0];
@@ -291,27 +331,16 @@ function Avatar({ name, avatar, onUpload, size = 80, isAdmin }) {
 
   return (
     <div style={{ position: 'relative', width: size, height: size, margin: '0 auto' }}>
-      <div 
-        onClick={() => isAdmin && inputRef.current?.click()}
-        style={{
-          width: size, height: size, borderRadius: '50%', overflow: 'hidden',
-          background: avatar ? 'none' : 'linear-gradient(135deg, #C9A882 0%, #A8916B 100%)',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          cursor: isAdmin ? 'pointer' : 'default', border: '3px solid white', boxShadow: '0 4px 12px rgba(0,0,0,0.15)'
-        }}
-      >
-        {avatar ? (
-          <img src={avatar} alt={name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-        ) : (
-          <Icon name="User" size={size * 0.45} color="white" />
-        )}
+      <div onClick={() => isAdmin && inputRef.current?.click()} style={{
+        width: size, height: size, borderRadius: '50%', overflow: 'hidden',
+        background: avatar ? 'none' : 'linear-gradient(135deg, #C9A882 0%, #A8916B 100%)',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        cursor: isAdmin ? 'pointer' : 'default', border: '3px solid white', boxShadow: '0 4px 12px rgba(0,0,0,0.15)'
+      }}>
+        {avatar ? <img src={avatar} alt={name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <Icon name="User" size={size * 0.45} color="white" />}
       </div>
       {isAdmin && (
-        <div style={{
-          position: 'absolute', bottom: 0, right: 0, width: 28, height: 28, borderRadius: '50%',
-          background: '#4F7942', display: 'flex', alignItems: 'center', justifyContent: 'center',
-          border: '2px solid white', cursor: 'pointer'
-        }} onClick={() => inputRef.current?.click()}>
+        <div style={{ position: 'absolute', bottom: 0, right: 0, width: 28, height: 28, borderRadius: '50%', background: '#4F7942', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '2px solid white', cursor: 'pointer' }} onClick={() => inputRef.current?.click()}>
           <Icon name="Camera" size={14} color="white" />
         </div>
       )}
@@ -320,7 +349,7 @@ function Avatar({ name, avatar, onUpload, size = 80, isAdmin }) {
   );
 }
 
-// Behavior Row with Daily State
+// Behavior Row
 function BehaviorRow({ item, dailyState, onAdd, onSubtract, loading, isAdmin }) {
   const state = dailyState || null;
   
@@ -329,84 +358,51 @@ function BehaviorRow({ item, dailyState, onAdd, onSubtract, loading, isAdmin }) 
       display: 'flex', alignItems: 'center', gap: 8, padding: '8px 4px', 
       borderBottom: '1px solid #E5D4B7',
       background: state === 'positive' ? '#F0FDF4' : state === 'negative' ? '#FEF2F2' : 'transparent',
-      borderRadius: state ? 8 : 0,
-      marginBottom: 2
+      borderRadius: state ? 8 : 0, marginBottom: 2
     }}>
-      {/* Minus Button/Status */}
       {isAdmin ? (
-        <button 
-          onClick={() => onSubtract(item)} 
-          disabled={loading || state === 'negative'}
-          className="btn-bounce" 
-          style={{
-            width: 36, height: 36, borderRadius: 10, border: 'none',
-            background: state === 'negative' ? '#B85C38' : 'linear-gradient(135deg, #B85C38 0%, #D4714D 100%)',
-            color: 'white', cursor: loading || state === 'negative' ? 'default' : 'pointer',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            opacity: state === 'negative' ? 1 : state === 'positive' ? 0.4 : 1,
-            boxShadow: state === 'negative' ? 'none' : '0 2px 8px rgba(184,92,56,0.25)',
-            flexShrink: 0, transition: 'all 0.15s'
-          }}
-        >
+        <button onClick={() => onSubtract(item)} disabled={loading || state === 'negative'} className="btn-bounce" style={{
+          width: 36, height: 36, borderRadius: 10, border: 'none',
+          background: state === 'negative' ? '#B85C38' : 'linear-gradient(135deg, #B85C38 0%, #D4714D 100%)',
+          color: 'white', cursor: loading || state === 'negative' ? 'default' : 'pointer',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          opacity: state === 'negative' ? 1 : state === 'positive' ? 0.4 : 1,
+          boxShadow: state === 'negative' ? 'none' : '0 2px 8px rgba(184,92,56,0.25)', flexShrink: 0
+        }}>
           {state === 'negative' ? <Icon name="Check" size={18} color="white" /> : <Icon name="Minus" size={18} color="white" />}
         </button>
       ) : (
-        <div style={{
-          width: 28, height: 28, borderRadius: 8, flexShrink: 0,
-          background: state === 'negative' ? '#B85C38' : state === 'positive' ? '#E5D4B7' : '#E5D4B7',
-          display: 'flex', alignItems: 'center', justifyContent: 'center'
-        }}>
-          {state === 'negative' && <Icon name="X" size={14} color="white" />}
-          {!state && <Icon name="Minus" size={14} color="#aaa" />}
+        <div style={{ width: 28, height: 28, borderRadius: 8, flexShrink: 0, background: state === 'negative' ? '#B85C38' : '#E5D4B7', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          {state === 'negative' ? <Icon name="X" size={14} color="white" /> : <Icon name="Minus" size={14} color="#aaa" />}
         </div>
       )}
 
-      {/* Label */}
       <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
-        <div style={{ 
-          width: 32, height: 32, borderRadius: 8, 
-          background: state === 'positive' ? '#4F7942' : state === 'negative' ? '#B85C38' : '#F5F0EB',
-          display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 
-        }}>
+        <div style={{ width: 32, height: 32, borderRadius: 8, background: state === 'positive' ? '#4F7942' : state === 'negative' ? '#B85C38' : '#F5F0EB', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
           <Icon name={item.icon} size={16} color={state ? 'white' : '#A8916B'} />
         </div>
         <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ 
-            fontWeight: 600, color: state === 'positive' ? '#4F7942' : state === 'negative' ? '#B85C38' : '#4A4A4A', 
-            fontSize: '0.85rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' 
-          }}>
+          <div style={{ fontWeight: 600, color: state === 'positive' ? '#4F7942' : state === 'negative' ? '#B85C38' : '#4A4A4A', fontSize: '0.85rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
             {state === 'positive' ? item.posLabel : state === 'negative' ? item.negLabel : item.label}
           </div>
           <div style={{ fontSize: '0.7rem', color: '#888' }}>±{item.points} pts</div>
         </div>
       </div>
 
-      {/* Plus Button/Status */}
       {isAdmin ? (
-        <button 
-          onClick={() => onAdd(item)} 
-          disabled={loading || state === 'positive'}
-          className="btn-bounce" 
-          style={{
-            width: 36, height: 36, borderRadius: 10, border: 'none',
-            background: state === 'positive' ? '#4F7942' : 'linear-gradient(135deg, #4F7942 0%, #6B8E4E 100%)',
-            color: 'white', cursor: loading || state === 'positive' ? 'default' : 'pointer',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            opacity: state === 'positive' ? 1 : state === 'negative' ? 0.4 : 1,
-            boxShadow: state === 'positive' ? 'none' : '0 2px 8px rgba(79,121,66,0.25)',
-            flexShrink: 0, transition: 'all 0.15s'
-          }}
-        >
+        <button onClick={() => onAdd(item)} disabled={loading || state === 'positive'} className="btn-bounce" style={{
+          width: 36, height: 36, borderRadius: 10, border: 'none',
+          background: state === 'positive' ? '#4F7942' : 'linear-gradient(135deg, #4F7942 0%, #6B8E4E 100%)',
+          color: 'white', cursor: loading || state === 'positive' ? 'default' : 'pointer',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          opacity: state === 'positive' ? 1 : state === 'negative' ? 0.4 : 1,
+          boxShadow: state === 'positive' ? 'none' : '0 2px 8px rgba(79,121,66,0.25)', flexShrink: 0
+        }}>
           {state === 'positive' ? <Icon name="Check" size={18} color="white" /> : <Icon name="Plus" size={18} color="white" />}
         </button>
       ) : (
-        <div style={{
-          width: 28, height: 28, borderRadius: 8, flexShrink: 0,
-          background: state === 'positive' ? '#4F7942' : state === 'negative' ? '#E5D4B7' : '#E5D4B7',
-          display: 'flex', alignItems: 'center', justifyContent: 'center'
-        }}>
-          {state === 'positive' && <Icon name="Check" size={14} color="white" />}
-          {!state && <Icon name="Plus" size={14} color="#aaa" />}
+        <div style={{ width: 28, height: 28, borderRadius: 8, flexShrink: 0, background: state === 'positive' ? '#4F7942' : '#E5D4B7', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          {state === 'positive' ? <Icon name="Check" size={14} color="white" /> : <Icon name="Plus" size={14} color="#aaa" />}
         </div>
       )}
     </div>
@@ -415,15 +411,18 @@ function BehaviorRow({ item, dailyState, onAdd, onSubtract, loading, isAdmin }) 
 
 // Weekly Chart
 function WeeklyChart({ history, name }) {
-  const days = [];
-  for (let i = 6; i >= 0; i--) {
-    const d = new Date();
-    d.setDate(d.getDate() - i);
-    const dateStr = d.toISOString().split('T')[0];
-    const dayHistory = (history[name] || []).filter(h => h.date === dateStr);
-    const points = dayHistory.reduce((sum, h) => sum + h.points, 0);
-    days.push({ day: d.toLocaleDateString('en-US', { weekday: 'short' }), points, isToday: i === 0 });
-  }
+  const days = useMemo(() => {
+    const result = [];
+    for (let i = 6; i >= 0; i--) {
+      const d = new Date();
+      d.setDate(d.getDate() - i);
+      const dateStr = d.toISOString().split('T')[0];
+      const dayHistory = (history[name] || []).filter(h => h.date === dateStr);
+      const points = dayHistory.reduce((sum, h) => sum + h.points, 0);
+      result.push({ day: d.toLocaleDateString('en-US', { weekday: 'short' }), points, isToday: i === 0 });
+    }
+    return result;
+  }, [history, name]);
   
   const maxAbs = Math.max(50, ...days.map(d => Math.abs(d.points)));
   
@@ -437,9 +436,7 @@ function WeeklyChart({ history, name }) {
               width: '100%', maxWidth: 30, 
               height: Math.max(4, Math.abs(d.points) / maxAbs * 60),
               background: d.points >= 0 ? '#4F7942' : '#B85C38',
-              borderRadius: 4,
-              marginBottom: 4,
-              opacity: d.isToday ? 1 : 0.7
+              borderRadius: 4, marginBottom: 4, opacity: d.isToday ? 1 : 0.7
             }} />
             <span style={{ fontSize: '0.65rem', color: d.isToday ? '#4A4A4A' : '#888', fontWeight: d.isToday ? 600 : 400 }}>{d.day}</span>
             <span style={{ fontSize: '0.6rem', color: d.points >= 0 ? '#4F7942' : '#B85C38' }}>{d.points >= 0 ? '+' : ''}{d.points}</span>
@@ -468,18 +465,18 @@ function ScoreSummary({ scores, weeklyScores }) {
   );
 }
 
-// Category Progress
-function CategoryProgress({ history, name }) {
-  const todayStr = today();
-  const todayHistory = (history[name] || []).filter(h => h.date === todayStr);
+// Category Progress - uses dailyStates for consistency
+function CategoryProgress({ dailyStates, name }) {
+  const childState = dailyStates[name] || {};
   
-  const catStats = Object.entries(behaviorsByCategory).map(([catName, cat]) => {
-    const total = cat.items.length;
-    const positive = cat.items.filter(item => 
-      todayHistory.some(h => h.id === item.id + '-pos')
-    ).length;
-    return { name: catName, total, positive };
-  });
+  const catStats = useMemo(() => {
+    return Object.entries(behaviorsByCategory).map(([catName, cat]) => {
+      const total = cat.items.length;
+      const positive = cat.items.filter(item => childState[item.id] === 'positive').length;
+      const negative = cat.items.filter(item => childState[item.id] === 'negative').length;
+      return { name: catName, total, positive, negative, completed: positive + negative };
+    });
+  }, [childState]);
 
   return (
     <div style={{ padding: 16 }}>
@@ -488,10 +485,11 @@ function CategoryProgress({ history, name }) {
         {catStats.map(cat => (
           <div key={cat.name} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <span style={{ fontSize: '0.7rem', color: '#888', width: 70, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{cat.name}</span>
-            <div style={{ flex: 1, height: 8, background: '#E5D4B7', borderRadius: 4, overflow: 'hidden' }}>
-              <div style={{ width: `${(cat.positive / cat.total) * 100}%`, height: '100%', background: '#4F7942', borderRadius: 4 }} />
+            <div style={{ flex: 1, height: 8, background: '#E5D4B7', borderRadius: 4, overflow: 'hidden', display: 'flex' }}>
+              <div style={{ width: `${(cat.positive / cat.total) * 100}%`, height: '100%', background: '#4F7942' }} />
+              <div style={{ width: `${(cat.negative / cat.total) * 100}%`, height: '100%', background: '#B85C38' }} />
             </div>
-            <span style={{ fontSize: '0.65rem', color: '#888', width: 30 }}>{cat.positive}/{cat.total}</span>
+            <span style={{ fontSize: '0.65rem', color: '#888', width: 30 }}>{cat.completed}/{cat.total}</span>
           </div>
         ))}
       </div>
@@ -500,15 +498,14 @@ function CategoryProgress({ history, name }) {
 }
 
 // Child Panel
-function ChildPanel({ name, scores, weeklyScores, history, dailyStates, avatar, onRecord, onUndo, onReset, onAvatarUpload, loading, isAdmin, panelId }) {
+function ChildPanel({ name, scores, weeklyScores, todayScores, history, dailyStates, avatar, onRecord, onUndo, onReset, onAvatarUpload, loading, isAdmin, panelId }) {
   const score = scores[name] || 0;
   const weeklyScore = weeklyScores[name] || 0;
+  const todayScore = todayScores[name] || 0;
   const childHistory = history[name] || [];
   const childDailyState = dailyStates[name] || {};
   const activeRestrictions = restrictions.filter(r => score <= r.threshold);
   const hasRestrictions = activeRestrictions.length > 0;
-  const todayHistory = childHistory.filter(h => h.date === today());
-  const todayPoints = todayHistory.reduce((sum, h) => sum + h.points, 0);
   const [expandedCat, setExpandedCat] = useState('Punctuality');
 
   const handleAdd = (item) => {
@@ -526,21 +523,17 @@ function ChildPanel({ name, scores, weeklyScores, history, dailyStates, avatar, 
       border: hasRestrictions ? '3px solid #B85C38' : '1px solid #E5D4B7',
       overflow: 'hidden', minWidth: 340, maxWidth: 400, flex: 1
     }}>
-      {/* Header */}
-      <div style={{ 
-        background: `linear-gradient(135deg, ${getColor(score)} 0%, ${getColor(score)}dd 100%)`, 
-        padding: '20px 16px', textAlign: 'center', color: 'white' 
-      }}>
+      <div style={{ background: `linear-gradient(135deg, ${getColor(score)} 0%, ${getColor(score)}dd 100%)`, padding: '20px 16px', textAlign: 'center', color: 'white' }}>
         <Avatar name={name} avatar={avatar} onUpload={onAvatarUpload} size={70} isAdmin={isAdmin} />
         <h2 style={{ margin: '10px 0 4px', fontSize: '1.4rem', fontWeight: 600 }}>{name}</h2>
         <div style={{ fontSize: '2.2rem', fontWeight: 700 }}>{score}</div>
         <div style={{ fontSize: '0.85rem', opacity: 0.9 }}>points total</div>
         <div style={{ marginTop: 8, display: 'flex', justifyContent: 'center', gap: 16, fontSize: '0.8rem' }}>
           <span style={{ background: 'rgba(255,255,255,0.2)', padding: '4px 12px', borderRadius: 12 }}>
-            Today: <strong>{todayPoints >= 0 ? '+' : ''}{todayPoints}</strong>
+            Today: <strong style={{ color: todayScore >= 0 ? '#fff' : '#ffcccc' }}>{todayScore >= 0 ? '+' : ''}{todayScore}</strong>
           </span>
           <span style={{ background: 'rgba(255,255,255,0.2)', padding: '4px 12px', borderRadius: 12 }}>
-            Week: <strong>{weeklyScore >= 0 ? '+' : ''}{weeklyScore}</strong>
+            Week: <strong style={{ color: weeklyScore >= 0 ? '#fff' : '#ffcccc' }}>{weeklyScore >= 0 ? '+' : ''}{weeklyScore}</strong>
           </span>
         </div>
         {!isAdmin && (
@@ -551,75 +544,45 @@ function ChildPanel({ name, scores, weeklyScores, history, dailyStates, avatar, 
       </div>
 
       <div style={{ padding: 12 }}>
-        {/* Restrictions */}
         {hasRestrictions && (
           <div style={{ background: '#FEF2F2', border: '1px solid #FECACA', borderRadius: 10, padding: 10, marginBottom: 12 }}>
             <div style={{ fontWeight: 600, color: '#B85C38', marginBottom: 4, fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: 4 }}>
               <Icon name="AlertTriangle" size={14} color="#B85C38" /> Restrictions Active
             </div>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
-              {activeRestrictions.map(r => (
-                <span key={r.threshold} style={{ padding: '3px 8px', background: 'white', borderRadius: 6, color: '#B85C38', fontSize: '0.7rem', fontWeight: 500 }}>
-                  {r.label}
-                </span>
-              ))}
+              {activeRestrictions.map(r => (<span key={r.threshold} style={{ padding: '3px 8px', background: 'white', borderRadius: 6, color: '#B85C38', fontSize: '0.7rem', fontWeight: 500 }}>{r.label}</span>))}
             </div>
           </div>
         )}
 
-        {/* Rewards Available */}
         {score >= 20 && !hasRestrictions && (
           <div style={{ background: '#FEF7ED', border: '1px solid #FCD9B6', borderRadius: 10, padding: 10, marginBottom: 12 }}>
             <div style={{ fontWeight: 600, color: '#92400E', marginBottom: 4, fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: 4 }}>
               <Icon name="Gift" size={14} color="#C9A882" /> Rewards Available!
             </div>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
-              {rewards.filter(r => score >= r.points).slice(0, 3).map(r => (
-                <span key={r.id} style={{ padding: '3px 8px', background: 'white', borderRadius: 6, color: '#92400E', fontSize: '0.7rem', fontWeight: 500 }}>
-                  {r.label}
-                </span>
-              ))}
+              {rewards.filter(r => score >= r.points).slice(0, 3).map(r => (<span key={r.id} style={{ padding: '3px 8px', background: 'white', borderRadius: 6, color: '#92400E', fontSize: '0.7rem', fontWeight: 500 }}>{r.label}</span>))}
             </div>
           </div>
         )}
 
-        {/* Categories */}
         <div style={{ maxHeight: 380, overflowY: 'auto' }}>
           {Object.entries(behaviorsByCategory).map(([catName, cat]) => {
             const completedCount = cat.items.filter(item => childDailyState[item.id]).length;
             return (
               <div key={catName} style={{ marginBottom: 8 }}>
-                <button 
-                  onClick={() => setExpandedCat(expandedCat === catName ? null : catName)}
-                  style={{ 
-                    width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                    padding: '8px 12px', background: cat.color, borderRadius: 8, border: 'none',
-                    cursor: 'pointer'
-                  }}
-                >
+                <button onClick={() => setExpandedCat(expandedCat === catName ? null : catName)} style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 12px', background: cat.color, borderRadius: 8, border: 'none', cursor: 'pointer' }}>
                   <span style={{ display: 'flex', alignItems: 'center', gap: 6, fontWeight: 600, color: cat.textColor, fontSize: '0.85rem' }}>
-                    <Icon name={cat.icon} size={16} color={cat.textColor} />
-                    {catName}
+                    <Icon name={cat.icon} size={16} color={cat.textColor} />{catName}
                   </span>
                   <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                     <span style={{ fontSize: '0.75rem', color: cat.textColor, opacity: 0.8 }}>{completedCount}/{cat.items.length}</span>
                     <Icon name={expandedCat === catName ? 'ChevronUp' : 'ChevronDown'} size={16} color={cat.textColor} />
                   </span>
                 </button>
-                
                 {expandedCat === catName && (
                   <div style={{ paddingTop: 6 }}>
-                    {cat.items.map(item => (
-                      <BehaviorRow 
-                        key={item.id} 
-                        item={item} 
-                        dailyState={childDailyState[item.id]}
-                        onAdd={handleAdd} 
-                        onSubtract={handleSubtract} 
-                        loading={loading}
-                        isAdmin={isAdmin}
-                      />
-                    ))}
+                    {cat.items.map(item => (<BehaviorRow key={item.id} item={item} dailyState={childDailyState[item.id]} onAdd={handleAdd} onSubtract={handleSubtract} loading={loading} isAdmin={isAdmin} />))}
                   </div>
                 )}
               </div>
@@ -627,23 +590,12 @@ function ChildPanel({ name, scores, weeklyScores, history, dailyStates, avatar, 
           })}
         </div>
 
-        {/* Admin Actions */}
         {isAdmin && (
           <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
-            <button onClick={() => onUndo(name)} disabled={!childHistory.length || loading} style={{
-              flex: 1, padding: 10, borderRadius: 10, border: '2px dashed #D4B996',
-              background: childHistory.length ? 'white' : '#F5F5F5',
-              color: childHistory.length ? '#6B7280' : '#B0B0B0',
-              cursor: childHistory.length ? 'pointer' : 'not-allowed',
-              fontSize: '0.8rem', fontWeight: 500, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6
-            }}>
+            <button onClick={() => onUndo(name)} disabled={!childHistory.length || loading} style={{ flex: 1, padding: 10, borderRadius: 10, border: '2px dashed #D4B996', background: childHistory.length ? 'white' : '#F5F5F5', color: childHistory.length ? '#6B7280' : '#B0B0B0', cursor: childHistory.length ? 'pointer' : 'not-allowed', fontSize: '0.8rem', fontWeight: 500, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
               <Icon name="Undo2" size={14} /> Undo
             </button>
-            <button onClick={() => onReset(name)} style={{
-              flex: 1, padding: 10, borderRadius: 10, border: 'none',
-              background: '#FEF2F2', color: '#B85C38', fontSize: '0.8rem', fontWeight: 500,
-              cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6
-            }}>
+            <button onClick={() => onReset(name)} style={{ flex: 1, padding: 10, borderRadius: 10, border: 'none', background: '#FEF2F2', color: '#B85C38', fontSize: '0.8rem', fontWeight: 500, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
               <Icon name="RotateCcw" size={14} /> Reset
             </button>
           </div>
@@ -654,57 +606,36 @@ function ChildPanel({ name, scores, weeklyScores, history, dailyStates, avatar, 
 }
 
 // Center Panel
-function CenterPanel({ scores, weeklyScores, history, claimed }) {
+function CenterPanel({ scores, weeklyScores, history, dailyStates, claimed }) {
   const [view, setView] = useState('charts');
   
   return (
-    <div id="center-panel" className="fade-in center-panel" style={{ 
-      flex: 1, minWidth: 280, maxWidth: 400, display: 'flex', flexDirection: 'column', gap: 16 
-    }}>
-      {/* Date */}
-      <div style={{ 
-        background: 'white', borderRadius: 16, padding: 16, textAlign: 'center',
-        boxShadow: '0 4px 16px rgba(74,74,74,0.08)', border: '1px solid #E5D4B7'
-      }}>
+    <div id="center-panel" className="fade-in center-panel" style={{ flex: 1, minWidth: 280, maxWidth: 400, display: 'flex', flexDirection: 'column', gap: 16 }}>
+      <div style={{ background: 'white', borderRadius: 16, padding: 16, textAlign: 'center', boxShadow: '0 4px 16px rgba(74,74,74,0.08)', border: '1px solid #E5D4B7' }}>
         <div style={{ fontSize: '0.8rem', color: '#888', marginBottom: 4 }}>Today is</div>
         <div style={{ fontSize: '1.2rem', fontWeight: 600, color: '#4A4A4A' }}>{formatDate()}</div>
       </div>
 
-      {/* Tabs */}
       <div style={{ display: 'flex', gap: 8 }}>
         {[['charts', 'BarChart3', 'Charts'], ['rewards', 'Gift', 'Rewards']].map(([v, icon, label]) => (
-          <button key={v} onClick={() => setView(v)} style={{
-            flex: 1, padding: '10px', borderRadius: 10,
-            border: view === v ? 'none' : '1px solid #D4B996',
-            background: view === v ? '#4F7942' : 'white',
-            color: view === v ? 'white' : '#4A4A4A',
-            fontSize: '0.85rem', fontWeight: 600, cursor: 'pointer',
-            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6
-          }}>
+          <button key={v} onClick={() => setView(v)} style={{ flex: 1, padding: '10px', borderRadius: 10, border: view === v ? 'none' : '1px solid #D4B996', background: view === v ? '#4F7942' : 'white', color: view === v ? 'white' : '#4A4A4A', fontSize: '0.85rem', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
             <Icon name={icon} size={16} color={view === v ? 'white' : '#4F7942'} /> {label}
           </button>
         ))}
       </div>
 
       {view === 'charts' && (
-        <div style={{ 
-          background: 'white', borderRadius: 16, overflow: 'hidden',
-          boxShadow: '0 4px 16px rgba(74,74,74,0.08)', border: '1px solid #E5D4B7'
-        }}>
+        <div style={{ background: 'white', borderRadius: 16, overflow: 'hidden', boxShadow: '0 4px 16px rgba(74,74,74,0.08)', border: '1px solid #E5D4B7' }}>
           <ScoreSummary scores={scores} weeklyScores={weeklyScores} />
           <div style={{ borderTop: '1px solid #E5D4B7' }}><WeeklyChart history={history} name="Artin" /></div>
           <div style={{ borderTop: '1px solid #E5D4B7' }}><WeeklyChart history={history} name="Aiden" /></div>
-          <div style={{ borderTop: '1px solid #E5D4B7' }}><CategoryProgress history={history} name="Artin" /></div>
-          <div style={{ borderTop: '1px solid #E5D4B7' }}><CategoryProgress history={history} name="Aiden" /></div>
+          <div style={{ borderTop: '1px solid #E5D4B7' }}><CategoryProgress dailyStates={dailyStates} name="Artin" /></div>
+          <div style={{ borderTop: '1px solid #E5D4B7' }}><CategoryProgress dailyStates={dailyStates} name="Aiden" /></div>
         </div>
       )}
 
       {view === 'rewards' && (
-        <div style={{ 
-          background: 'white', borderRadius: 16, padding: 16,
-          boxShadow: '0 4px 16px rgba(74,74,74,0.08)', border: '1px solid #E5D4B7',
-          maxHeight: 500, overflowY: 'auto'
-        }}>
+        <div style={{ background: 'white', borderRadius: 16, padding: 16, boxShadow: '0 4px 16px rgba(74,74,74,0.08)', border: '1px solid #E5D4B7', maxHeight: 500, overflowY: 'auto' }}>
           {['Artin', 'Aiden'].map(name => (
             <div key={name} style={{ marginBottom: 20 }}>
               <h4 style={{ margin: '0 0 10px', fontSize: '1rem', color: '#4A4A4A' }}>{name}'s Rewards</h4>
@@ -713,16 +644,8 @@ function CenterPanel({ scores, weeklyScores, history, claimed }) {
                   const can = (scores[name] || 0) >= r.points;
                   const done = (claimed[name] || []).includes(r.id);
                   return (
-                    <div key={r.id} style={{
-                      display: 'flex', alignItems: 'center', gap: 10, padding: '8px 10px', borderRadius: 8,
-                      background: done ? '#E8F5E9' : can ? '#FEF7ED' : '#F5F5F5',
-                      border: `1px solid ${done ? '#4F7942' : can ? '#C9A882' : '#E5E5E5'}`
-                    }}>
-                      <div style={{
-                        width: 28, height: 28, borderRadius: 6,
-                        background: done ? '#4F7942' : can ? '#C9A882' : '#D4D4D4',
-                        display: 'flex', alignItems: 'center', justifyContent: 'center'
-                      }}>
+                    <div key={r.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 10px', borderRadius: 8, background: done ? '#E8F5E9' : can ? '#FEF7ED' : '#F5F5F5', border: `1px solid ${done ? '#4F7942' : can ? '#C9A882' : '#E5E5E5'}` }}>
+                      <div style={{ width: 28, height: 28, borderRadius: 6, background: done ? '#4F7942' : can ? '#C9A882' : '#D4D4D4', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                         <Icon name={r.icon} size={14} color="white" />
                       </div>
                       <div style={{ flex: 1 }}>
@@ -741,22 +664,16 @@ function CenterPanel({ scores, weeklyScores, history, claimed }) {
         </div>
       )}
 
-      {/* Weekly Goal */}
-      <div style={{ 
-        background: 'white', borderRadius: 16, padding: 16,
-        boxShadow: '0 4px 16px rgba(74,74,74,0.08)', border: '1px solid #E5D4B7'
-      }}>
-        <h4 style={{ margin: '0 0 12px', fontSize: '0.9rem', color: '#4A4A4A', textAlign: 'center' }}>
-          Weekly Goal: 150 pts
-        </h4>
+      <div style={{ background: 'white', borderRadius: 16, padding: 16, boxShadow: '0 4px 16px rgba(74,74,74,0.08)', border: '1px solid #E5D4B7' }}>
+        <h4 style={{ margin: '0 0 12px', fontSize: '0.9rem', color: '#4A4A4A', textAlign: 'center' }}>Weekly Goal: 150 pts</h4>
         {['Artin', 'Aiden'].map(name => {
           const score = weeklyScores[name] || 0;
-          const pct = Math.min(100, (score / 150) * 100);
+          const pct = Math.min(100, Math.max(0, (score / 150) * 100));
           return (
             <div key={name} style={{ marginBottom: 10 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
                 <span style={{ fontSize: '0.8rem', fontWeight: 600, color: '#4A4A4A' }}>{name}</span>
-                <span style={{ fontSize: '0.8rem', color: '#888' }}>{score}/150 {score >= 150 && '🎉'}</span>
+                <span style={{ fontSize: '0.8rem', color: score >= 0 ? '#4F7942' : '#B85C38' }}>{score}/150 {score >= 150 && '🎉'}</span>
               </div>
               <div style={{ height: 10, background: '#E5D4B7', borderRadius: 5, overflow: 'hidden' }}>
                 <div style={{ width: `${pct}%`, height: '100%', background: getColor(score), borderRadius: 5, transition: 'width 0.3s' }} />
@@ -769,41 +686,20 @@ function CenterPanel({ scores, weeklyScores, history, claimed }) {
   );
 }
 
-// Mobile Navigation
+// Mobile Nav
 function MobileNav({ avatars }) {
-  const scrollTo = (id) => {
-    document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-  };
-
+  const scrollTo = (id) => document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   return (
     <div className="mobile-nav">
-      <button 
-        onClick={() => scrollTo('artin-panel')}
-        style={{ background: 'linear-gradient(135deg, #87CEEB 0%, #6BB8D9 100%)', color: '#2C3E50' }}
-      >
-        {avatars.Artin ? (
-          <img src={avatars.Artin} alt="Artin" style={{ width: 24, height: 24, borderRadius: '50%', objectFit: 'cover' }} />
-        ) : (
-          <Icon name="User" size={18} color="#2C3E50" />
-        )}
+      <button onClick={() => scrollTo('artin-panel')} style={{ background: 'linear-gradient(135deg, #87CEEB 0%, #6BB8D9 100%)', color: '#2C3E50' }}>
+        {avatars.Artin ? <img src={avatars.Artin} alt="Artin" style={{ width: 24, height: 24, borderRadius: '50%', objectFit: 'cover' }} /> : <Icon name="User" size={18} color="#2C3E50" />}
         Artin
       </button>
-      <button 
-        onClick={() => scrollTo('center-panel')}
-        style={{ background: 'linear-gradient(135deg, #C9A882 0%, #A8916B 100%)', color: 'white' }}
-      >
-        <Icon name="BarChart3" size={18} color="white" />
-        Charts
+      <button onClick={() => scrollTo('center-panel')} style={{ background: 'linear-gradient(135deg, #C9A882 0%, #A8916B 100%)', color: 'white' }}>
+        <Icon name="BarChart3" size={18} color="white" /> Charts
       </button>
-      <button 
-        onClick={() => scrollTo('aiden-panel')}
-        style={{ background: 'linear-gradient(135deg, #4F7942 0%, #6B8E4E 100%)', color: 'white' }}
-      >
-        {avatars.Aiden ? (
-          <img src={avatars.Aiden} alt="Aiden" style={{ width: 24, height: 24, borderRadius: '50%', objectFit: 'cover' }} />
-        ) : (
-          <Icon name="User" size={18} color="white" />
-        )}
+      <button onClick={() => scrollTo('aiden-panel')} style={{ background: 'linear-gradient(135deg, #4F7942 0%, #6B8E4E 100%)', color: 'white' }}>
+        {avatars.Aiden ? <img src={avatars.Aiden} alt="Aiden" style={{ width: 24, height: 24, borderRadius: '50%', objectFit: 'cover' }} /> : <Icon name="User" size={18} color="white" />}
         Aiden
       </button>
     </div>
@@ -815,66 +711,59 @@ function App() {
   const [authMode, setAuthMode] = useState(() => localStorage.getItem('bt_auth'));
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [scores, setScores] = useState({ Artin: 0, Aiden: 0 });
-  const [weeklyScores, setWeeklyScores] = useState({ Artin: 0, Aiden: 0 });
   const [history, setHistory] = useState({ Artin: [], Aiden: [] });
   const [claimed, setClaimed] = useState({ Artin: [], Aiden: [] });
-  const [dailyStates, setDailyStates] = useState({ Artin: {}, Aiden: {} });
   const [avatars, setAvatars] = useState({ Artin: null, Aiden: null });
-  const [lastDate, setLastDate] = useState(today());
 
   const isAdmin = authMode === 'admin';
 
-  useEffect(() => { if (authMode) loadData(); }, [authMode]);
+  // Derive all scores from history (single source of truth)
+  const scores = useMemo(() => calculateScores(history), [history]);
+  const weeklyScores = useMemo(() => calculateWeeklyScores(history), [history]);
+  const todayScores = useMemo(() => calculateTodayScores(history), [history]);
+  const dailyStates = useMemo(() => buildDailyStates(history), [history]);
 
-  useEffect(() => {
-    const checkDay = () => {
-      const currentDay = today();
-      if (currentDay !== lastDate) {
-        setDailyStates({ Artin: {}, Aiden: {} });
-        setLastDate(currentDay);
-      }
-    };
-    const interval = setInterval(checkDay, 60000);
-    return () => clearInterval(interval);
-  }, [lastDate]);
+  useEffect(() => { if (authMode) loadData(); }, [authMode]);
 
   const loadData = async () => {
     setLoading(true);
+    
+    // Load avatars
     const savedAvatars = localStorage.getItem('bt_avatars');
     if (savedAvatars) setAvatars(JSON.parse(savedAvatars));
-    const savedStates = localStorage.getItem('bt_daily_states');
-    const savedDate = localStorage.getItem('bt_daily_date');
-    if (savedStates && savedDate === today()) setDailyStates(JSON.parse(savedStates));
 
     try {
       const data = await api.getData();
-      if (data) {
-        setScores(data.scores || { Artin: 0, Aiden: 0 });
-        setWeeklyScores(data.weeklyScores || { Artin: 0, Aiden: 0 });
-        setHistory(data.history || { Artin: [], Aiden: [] });
+      if (data && data.history) {
+        setHistory(data.history);
         setClaimed(data.claimed || { Artin: [], Aiden: [] });
+      } else {
+        // Fallback to localStorage
+        const saved = localStorage.getItem('bt_data_v8');
+        if (saved) {
+          const localData = JSON.parse(saved);
+          setHistory(localData.history || { Artin: [], Aiden: [] });
+          setClaimed(localData.claimed || { Artin: [], Aiden: [] });
+        }
       }
     } catch (e) { 
-      const saved = localStorage.getItem('bt_data_v7');
+      console.error('Load error:', e);
+      const saved = localStorage.getItem('bt_data_v8');
       if (saved) {
-        const data = JSON.parse(saved);
-        setScores(data.scores || { Artin: 0, Aiden: 0 });
-        setWeeklyScores(data.weeklyScores || { Artin: 0, Aiden: 0 });
-        setHistory(data.history || { Artin: [], Aiden: [] });
-        setClaimed(data.claimed || { Artin: [], Aiden: [] });
+        const localData = JSON.parse(saved);
+        setHistory(localData.history || { Artin: [], Aiden: [] });
+        setClaimed(localData.claimed || { Artin: [], Aiden: [] });
       }
     }
     setLoading(false);
   };
 
+  // Save to localStorage whenever history changes
   useEffect(() => {
     if (authMode && !loading) {
-      localStorage.setItem('bt_data_v7', JSON.stringify({ scores, weeklyScores, history, claimed }));
-      localStorage.setItem('bt_daily_states', JSON.stringify(dailyStates));
-      localStorage.setItem('bt_daily_date', today());
+      localStorage.setItem('bt_data_v8', JSON.stringify({ history, claimed }));
     }
-  }, [scores, weeklyScores, history, claimed, dailyStates, authMode, loading]);
+  }, [history, claimed, authMode, loading]);
 
   const handleAvatarUpload = (name, dataUrl) => {
     if (!isAdmin) return;
@@ -885,16 +774,15 @@ function App() {
 
   const record = async (child, behavior) => {
     if (!isAdmin) return;
-    const behaviorId = behavior.behaviorId;
-    if (dailyStates[child]?.[behaviorId]) return;
+    
+    // Check if already recorded today
+    const currentDailyStates = buildDailyStates(history);
+    if (currentDailyStates[child]?.[behavior.behaviorId]) return;
 
     setSaving(true);
     const entry = { ...behavior, timestamp: new Date().toISOString(), date: today() };
     
-    setScores(s => ({ ...s, [child]: s[child] + behavior.points }));
-    setWeeklyScores(s => ({ ...s, [child]: s[child] + behavior.points }));
     setHistory(h => ({ ...h, [child]: [entry, ...h[child]] }));
-    setDailyStates(ds => ({ ...ds, [child]: { ...ds[child], [behaviorId]: behavior.type } }));
 
     try { await api.recordBehavior(child, behavior); } catch (e) { console.error(e); }
     setSaving(false);
@@ -903,19 +791,8 @@ function App() {
   const undo = async (child) => {
     if (!isAdmin || !history[child]?.length) return;
     setSaving(true);
-    const last = history[child][0];
     
-    setScores(s => ({ ...s, [child]: s[child] - last.points }));
-    setWeeklyScores(s => ({ ...s, [child]: s[child] - last.points }));
     setHistory(h => ({ ...h, [child]: h[child].slice(1) }));
-    
-    if (last.date === today() && last.behaviorId) {
-      setDailyStates(ds => {
-        const newState = { ...ds[child] };
-        delete newState[last.behaviorId];
-        return { ...ds, [child]: newState };
-      });
-    }
 
     try { await api.undoLast(child); } catch (e) { console.error(e); }
     setSaving(false);
@@ -925,11 +802,8 @@ function App() {
     if (!isAdmin) return;
     if (!confirm(`Reset ${child}'s score and history? This cannot be undone.`)) return;
     
-    setScores(s => ({ ...s, [child]: 0 }));
-    setWeeklyScores(s => ({ ...s, [child]: 0 }));
     setHistory(h => ({ ...h, [child]: [] }));
     setClaimed(c => ({ ...c, [child]: [] }));
-    setDailyStates(ds => ({ ...ds, [child]: {} }));
 
     try { await api.resetChild(child); } catch (e) { console.error(e); }
   };
@@ -949,11 +823,8 @@ function App() {
 
   return (
     <div style={{ minHeight: '100vh' }}>
-      {/* Header */}
       <header style={{ 
-        background: isAdmin 
-          ? 'linear-gradient(135deg, #4F7942 0%, #6B8E4E 100%)' 
-          : 'linear-gradient(135deg, #87CEEB 0%, #6BB8D9 100%)', 
+        background: isAdmin ? 'linear-gradient(135deg, #4F7942 0%, #6B8E4E 100%)' : 'linear-gradient(135deg, #87CEEB 0%, #6BB8D9 100%)', 
         padding: '12px 20px', color: isAdmin ? 'white' : '#2C3E50', 
         display: 'flex', justifyContent: 'space-between', alignItems: 'center',
         position: 'sticky', top: 0, zIndex: 100
@@ -968,44 +839,20 @@ function App() {
             {saving && ' • 💾 Saving...'}
           </div>
         </div>
-        <button onClick={logout} style={{
-          padding: '8px 14px', borderRadius: 8, border: 'none',
-          background: 'rgba(255,255,255,0.2)', color: isAdmin ? 'white' : '#2C3E50',
-          fontSize: '0.85rem', fontWeight: 500, cursor: 'pointer',
-          display: 'flex', alignItems: 'center', gap: 6
-        }}>
+        <button onClick={logout} style={{ padding: '8px 14px', borderRadius: 8, border: 'none', background: 'rgba(255,255,255,0.2)', color: isAdmin ? 'white' : '#2C3E50', fontSize: '0.85rem', fontWeight: 500, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}>
           <Icon name="LogOut" size={16} /> Lock
         </button>
       </header>
 
-      {/* Mobile Nav */}
       <MobileNav avatars={avatars} />
 
-      {/* Main */}
-      <main className="three-panel" style={{ 
-        display: 'flex', gap: 20, padding: 20, maxWidth: 1400, margin: '0 auto',
-        alignItems: 'flex-start'
-      }}>
-        <ChildPanel 
-          name="Artin" panelId="artin-panel"
-          scores={scores} weeklyScores={weeklyScores} history={history}
-          dailyStates={dailyStates} avatar={avatars.Artin}
-          onRecord={record} onUndo={undo} onReset={resetChild}
-          onAvatarUpload={handleAvatarUpload} loading={saving} isAdmin={isAdmin}
-        />
-        <CenterPanel scores={scores} weeklyScores={weeklyScores} history={history} claimed={claimed} />
-        <ChildPanel 
-          name="Aiden" panelId="aiden-panel"
-          scores={scores} weeklyScores={weeklyScores} history={history}
-          dailyStates={dailyStates} avatar={avatars.Aiden}
-          onRecord={record} onUndo={undo} onReset={resetChild}
-          onAvatarUpload={handleAvatarUpload} loading={saving} isAdmin={isAdmin}
-        />
+      <main className="three-panel" style={{ display: 'flex', gap: 20, padding: 20, maxWidth: 1400, margin: '0 auto', alignItems: 'flex-start' }}>
+        <ChildPanel name="Artin" panelId="artin-panel" scores={scores} weeklyScores={weeklyScores} todayScores={todayScores} history={history} dailyStates={dailyStates} avatar={avatars.Artin} onRecord={record} onUndo={undo} onReset={resetChild} onAvatarUpload={handleAvatarUpload} loading={saving} isAdmin={isAdmin} />
+        <CenterPanel scores={scores} weeklyScores={weeklyScores} history={history} dailyStates={dailyStates} claimed={claimed} />
+        <ChildPanel name="Aiden" panelId="aiden-panel" scores={scores} weeklyScores={weeklyScores} todayScores={todayScores} history={history} dailyStates={dailyStates} avatar={avatars.Aiden} onRecord={record} onUndo={undo} onReset={resetChild} onAvatarUpload={handleAvatarUpload} loading={saving} isAdmin={isAdmin} />
       </main>
 
-      <footer style={{ textAlign: 'center', padding: 16, color: '#888', fontSize: '0.8rem' }}>
-        ☁️ Synced with Google Sheets
-      </footer>
+      <footer style={{ textAlign: 'center', padding: 16, color: '#888', fontSize: '0.8rem' }}>☁️ Synced with Google Sheets</footer>
     </div>
   );
 }
