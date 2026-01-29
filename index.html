@@ -26,7 +26,7 @@
       --danger: #B85C38;
     }
     * { margin: 0; padding: 0; box-sizing: border-box; }
-    html { font-size: 16px; }
+    html { font-size: 16px; scroll-behavior: smooth; }
     body {
       font-family: 'Source Sans 3', -apple-system, sans-serif;
       background: linear-gradient(165deg, var(--cream) 0%, var(--sand-lighter) 50%, var(--sand-light) 100%);
@@ -39,15 +39,51 @@
     ::-webkit-scrollbar-thumb { background: var(--sand-warm); border-radius: 3px; }
     @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
     @keyframes spin { to { transform: rotate(360deg); } }
-    @keyframes pulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.1); } }
     .fade-in { animation: fadeIn 0.3s ease-out; }
     .spin { animation: spin 1s linear infinite; }
-    .pulse { animation: pulse 0.3s ease-out; }
     .btn-bounce:active { transform: scale(0.92); }
+    
+    /* Mobile Navigation */
+    .mobile-nav { display: none; }
+    .desktop-only { display: flex; }
+    
     @media (max-width: 1024px) {
-      .three-panel { flex-direction: column !important; }
-      .side-panel { min-width: 100% !important; max-width: 100% !important; }
-      .center-panel { order: -1 !important; }
+      .three-panel { flex-direction: column !important; align-items: center !important; }
+      .side-panel { min-width: 100% !important; max-width: 500px !important; width: 100% !important; }
+      .center-panel { 
+        order: -1 !important; 
+        min-width: 100% !important;
+        max-width: 500px !important;
+        width: 100% !important;
+      }
+      .mobile-nav { 
+        display: flex !important; 
+        position: sticky;
+        top: 52px;
+        z-index: 99;
+        background: white;
+        padding: 10px 16px;
+        gap: 8px;
+        border-bottom: 1px solid #E5D4B7;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+        justify-content: center;
+      }
+      .mobile-nav button {
+        flex: 1;
+        max-width: 140px;
+        padding: 10px 12px;
+        border-radius: 12px;
+        border: none;
+        font-weight: 600;
+        font-size: 0.9rem;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 6px;
+        transition: all 0.2s;
+      }
+      .desktop-only { display: none !important; }
     }
     @media (max-width: 768px) { html { font-size: 14px; } }
   </style>
@@ -58,7 +94,10 @@
 const { useState, useEffect, useRef } = React;
 
 const GOOGLE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxuEp2AwHSV3rN7D1Je1btpdtG1quMi6aaazCqqSxUJUq1rOfWzkXVb81Y2wnMQaC5O/exec';
-const PASSWORD = 'artaiden';
+
+// Passwords
+const VIEWER_PASSWORD = 'artaiden';  // Kids - view only
+const ADMIN_PASSWORD = '8006005';     // Dad - full access
 
 // Icon Component
 const Icon = ({ name, size = 20, color = 'currentColor' }) => {
@@ -159,12 +198,6 @@ const restrictions = [
 const getColor = s => s >= 100 ? '#4F7942' : s >= 50 ? '#6B8E4E' : s >= 20 ? '#87CEEB' : s >= 0 ? '#C9A882' : s >= -20 ? '#D4966B' : '#B85C38';
 const today = () => new Date().toISOString().split('T')[0];
 const formatDate = () => new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
-const weekStart = () => { const d = new Date(); d.setDate(d.getDate() - d.getDay()); return d.toISOString().split('T')[0]; };
-const getDayName = (offset) => {
-  const d = new Date();
-  d.setDate(d.getDate() - offset);
-  return d.toLocaleDateString('en-US', { weekday: 'short' });
-};
 
 // API
 const api = {
@@ -173,7 +206,7 @@ const api = {
       const res = await fetch(`${GOOGLE_SCRIPT_URL}?action=getData`);
       return res.json();
     } catch (e) {
-      const saved = localStorage.getItem('bt_data_v5');
+      const saved = localStorage.getItem('bt_data_v7');
       return saved ? JSON.parse(saved) : null;
     }
   },
@@ -195,7 +228,21 @@ const api = {
 function PasswordScreen({ onUnlock }) {
   const [pw, setPw] = useState('');
   const [err, setErr] = useState(false);
-  const submit = e => { e.preventDefault(); if (pw === PASSWORD) { localStorage.setItem('bt_auth', '1'); onUnlock(); } else { setErr(true); setTimeout(() => setErr(false), 2000); } };
+  
+  const submit = e => { 
+    e.preventDefault(); 
+    if (pw === ADMIN_PASSWORD) {
+      localStorage.setItem('bt_auth', 'admin');
+      onUnlock('admin');
+    } else if (pw === VIEWER_PASSWORD) {
+      localStorage.setItem('bt_auth', 'viewer');
+      onUnlock('viewer');
+    } else {
+      setErr(true);
+      setTimeout(() => setErr(false), 2000);
+    }
+  };
+  
   return (
     <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
       <div className="fade-in" style={{ background: 'white', borderRadius: 20, padding: '40px 32px', boxShadow: '0 16px 48px rgba(74,74,74,0.15)', textAlign: 'center', maxWidth: 380, width: '100%', border: '1px solid #E5D4B7' }}>
@@ -203,22 +250,37 @@ function PasswordScreen({ onUnlock }) {
           <Icon name="Lock" size={32} color="white" />
         </div>
         <h1 style={{ margin: '0 0 6px', color: '#4A4A4A', fontSize: '1.75rem' }}>Behavior Tracker</h1>
-        <p style={{ color: '#6B7280', marginBottom: 24 }}>Enter family password</p>
+        <p style={{ color: '#6B7280', marginBottom: 24 }}>Enter password to continue</p>
         <form onSubmit={submit}>
-          <input type="password" value={pw} onChange={e => setPw(e.target.value)} placeholder="Password" style={{ width: '100%', padding: '14px 18px', borderRadius: 10, border: `2px solid ${err ? '#B85C38' : '#E5D4B7'}`, fontSize: '1rem', marginBottom: 16, outline: 'none', background: '#FDFBF9' }} />
+          <input 
+            type="password" 
+            value={pw} 
+            onChange={e => setPw(e.target.value)} 
+            placeholder="Password" 
+            style={{ width: '100%', padding: '14px 18px', borderRadius: 10, border: `2px solid ${err ? '#B85C38' : '#E5D4B7'}`, fontSize: '1rem', marginBottom: 16, outline: 'none', background: '#FDFBF9' }} 
+          />
           {err && <p style={{ color: '#B85C38', marginBottom: 12, fontSize: '0.9rem' }}>Incorrect password</p>}
-          <button type="submit" style={{ width: '100%', padding: '14px', borderRadius: 10, border: 'none', background: 'linear-gradient(135deg, #4F7942 0%, #6B8E4E 100%)', color: 'white', fontSize: '1rem', fontWeight: 600, cursor: 'pointer' }}>Unlock</button>
+          <button type="submit" style={{ width: '100%', padding: '14px', borderRadius: 10, border: 'none', background: 'linear-gradient(135deg, #4F7942 0%, #6B8E4E 100%)', color: 'white', fontSize: '1rem', fontWeight: 600, cursor: 'pointer' }}>
+            Enter
+          </button>
         </form>
+        <div style={{ marginTop: 20, padding: 16, background: '#F9F6F2', borderRadius: 10, textAlign: 'left' }}>
+          <p style={{ fontSize: '0.8rem', color: '#888', margin: 0 }}>
+            <strong style={{ color: '#4A4A4A' }}>👦 Kids:</strong> View your progress<br/>
+            <strong style={{ color: '#4A4A4A' }}>👨 Dad:</strong> Edit behaviors & manage scores
+          </p>
+        </div>
       </div>
     </div>
   );
 }
 
 // Avatar Component
-function Avatar({ name, avatar, onUpload, size = 80 }) {
+function Avatar({ name, avatar, onUpload, size = 80, isAdmin }) {
   const inputRef = useRef(null);
   
   const handleUpload = (e) => {
+    if (!isAdmin) return;
     const file = e.target.files[0];
     if (file) {
       const reader = new FileReader();
@@ -230,12 +292,12 @@ function Avatar({ name, avatar, onUpload, size = 80 }) {
   return (
     <div style={{ position: 'relative', width: size, height: size, margin: '0 auto' }}>
       <div 
-        onClick={() => inputRef.current?.click()}
+        onClick={() => isAdmin && inputRef.current?.click()}
         style={{
           width: size, height: size, borderRadius: '50%', overflow: 'hidden',
           background: avatar ? 'none' : 'linear-gradient(135deg, #C9A882 0%, #A8916B 100%)',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
-          cursor: 'pointer', border: '3px solid white', boxShadow: '0 4px 12px rgba(0,0,0,0.15)'
+          cursor: isAdmin ? 'pointer' : 'default', border: '3px solid white', boxShadow: '0 4px 12px rgba(0,0,0,0.15)'
         }}
       >
         {avatar ? (
@@ -244,21 +306,23 @@ function Avatar({ name, avatar, onUpload, size = 80 }) {
           <Icon name="User" size={size * 0.45} color="white" />
         )}
       </div>
-      <div style={{
-        position: 'absolute', bottom: 0, right: 0, width: 28, height: 28, borderRadius: '50%',
-        background: '#4F7942', display: 'flex', alignItems: 'center', justifyContent: 'center',
-        border: '2px solid white', cursor: 'pointer'
-      }} onClick={() => inputRef.current?.click()}>
-        <Icon name="Camera" size={14} color="white" />
-      </div>
+      {isAdmin && (
+        <div style={{
+          position: 'absolute', bottom: 0, right: 0, width: 28, height: 28, borderRadius: '50%',
+          background: '#4F7942', display: 'flex', alignItems: 'center', justifyContent: 'center',
+          border: '2px solid white', cursor: 'pointer'
+        }} onClick={() => inputRef.current?.click()}>
+          <Icon name="Camera" size={14} color="white" />
+        </div>
+      )}
       <input ref={inputRef} type="file" accept="image/*" onChange={handleUpload} style={{ display: 'none' }} />
     </div>
   );
 }
 
 // Behavior Row with Daily State
-function BehaviorRow({ item, dailyState, onAdd, onSubtract, loading }) {
-  const state = dailyState || null; // 'positive', 'negative', or null
+function BehaviorRow({ item, dailyState, onAdd, onSubtract, loading, isAdmin }) {
+  const state = dailyState || null;
   
   return (
     <div style={{ 
@@ -268,23 +332,34 @@ function BehaviorRow({ item, dailyState, onAdd, onSubtract, loading }) {
       borderRadius: state ? 8 : 0,
       marginBottom: 2
     }}>
-      {/* Minus Button */}
-      <button 
-        onClick={() => onSubtract(item)} 
-        disabled={loading || state === 'negative'}
-        className="btn-bounce" 
-        style={{
-          width: 36, height: 36, borderRadius: 10, border: 'none',
-          background: state === 'negative' ? '#B85C38' : 'linear-gradient(135deg, #B85C38 0%, #D4714D 100%)',
-          color: 'white', cursor: loading || state === 'negative' ? 'default' : 'pointer',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          opacity: state === 'negative' ? 1 : state === 'positive' ? 0.4 : 1,
-          boxShadow: state === 'negative' ? 'none' : '0 2px 8px rgba(184,92,56,0.25)',
-          flexShrink: 0, transition: 'all 0.15s'
-        }}
-      >
-        {state === 'negative' ? <Icon name="Check" size={18} color="white" /> : <Icon name="Minus" size={18} color="white" />}
-      </button>
+      {/* Minus Button/Status */}
+      {isAdmin ? (
+        <button 
+          onClick={() => onSubtract(item)} 
+          disabled={loading || state === 'negative'}
+          className="btn-bounce" 
+          style={{
+            width: 36, height: 36, borderRadius: 10, border: 'none',
+            background: state === 'negative' ? '#B85C38' : 'linear-gradient(135deg, #B85C38 0%, #D4714D 100%)',
+            color: 'white', cursor: loading || state === 'negative' ? 'default' : 'pointer',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            opacity: state === 'negative' ? 1 : state === 'positive' ? 0.4 : 1,
+            boxShadow: state === 'negative' ? 'none' : '0 2px 8px rgba(184,92,56,0.25)',
+            flexShrink: 0, transition: 'all 0.15s'
+          }}
+        >
+          {state === 'negative' ? <Icon name="Check" size={18} color="white" /> : <Icon name="Minus" size={18} color="white" />}
+        </button>
+      ) : (
+        <div style={{
+          width: 28, height: 28, borderRadius: 8, flexShrink: 0,
+          background: state === 'negative' ? '#B85C38' : state === 'positive' ? '#E5D4B7' : '#E5D4B7',
+          display: 'flex', alignItems: 'center', justifyContent: 'center'
+        }}>
+          {state === 'negative' && <Icon name="X" size={14} color="white" />}
+          {!state && <Icon name="Minus" size={14} color="#aaa" />}
+        </div>
+      )}
 
       {/* Label */}
       <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
@@ -306,23 +381,34 @@ function BehaviorRow({ item, dailyState, onAdd, onSubtract, loading }) {
         </div>
       </div>
 
-      {/* Plus Button */}
-      <button 
-        onClick={() => onAdd(item)} 
-        disabled={loading || state === 'positive'}
-        className="btn-bounce" 
-        style={{
-          width: 36, height: 36, borderRadius: 10, border: 'none',
-          background: state === 'positive' ? '#4F7942' : 'linear-gradient(135deg, #4F7942 0%, #6B8E4E 100%)',
-          color: 'white', cursor: loading || state === 'positive' ? 'default' : 'pointer',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          opacity: state === 'positive' ? 1 : state === 'negative' ? 0.4 : 1,
-          boxShadow: state === 'positive' ? 'none' : '0 2px 8px rgba(79,121,66,0.25)',
-          flexShrink: 0, transition: 'all 0.15s'
-        }}
-      >
-        {state === 'positive' ? <Icon name="Check" size={18} color="white" /> : <Icon name="Plus" size={18} color="white" />}
-      </button>
+      {/* Plus Button/Status */}
+      {isAdmin ? (
+        <button 
+          onClick={() => onAdd(item)} 
+          disabled={loading || state === 'positive'}
+          className="btn-bounce" 
+          style={{
+            width: 36, height: 36, borderRadius: 10, border: 'none',
+            background: state === 'positive' ? '#4F7942' : 'linear-gradient(135deg, #4F7942 0%, #6B8E4E 100%)',
+            color: 'white', cursor: loading || state === 'positive' ? 'default' : 'pointer',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            opacity: state === 'positive' ? 1 : state === 'negative' ? 0.4 : 1,
+            boxShadow: state === 'positive' ? 'none' : '0 2px 8px rgba(79,121,66,0.25)',
+            flexShrink: 0, transition: 'all 0.15s'
+          }}
+        >
+          {state === 'positive' ? <Icon name="Check" size={18} color="white" /> : <Icon name="Plus" size={18} color="white" />}
+        </button>
+      ) : (
+        <div style={{
+          width: 28, height: 28, borderRadius: 8, flexShrink: 0,
+          background: state === 'positive' ? '#4F7942' : state === 'negative' ? '#E5D4B7' : '#E5D4B7',
+          display: 'flex', alignItems: 'center', justifyContent: 'center'
+        }}>
+          {state === 'positive' && <Icon name="Check" size={14} color="white" />}
+          {!state && <Icon name="Plus" size={14} color="#aaa" />}
+        </div>
+      )}
     </div>
   );
 }
@@ -349,7 +435,7 @@ function WeeklyChart({ history, name }) {
           <div key={i} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', flex: 1 }}>
             <div style={{ 
               width: '100%', maxWidth: 30, 
-              height: Math.abs(d.points) / maxAbs * 60,
+              height: Math.max(4, Math.abs(d.points) / maxAbs * 60),
               background: d.points >= 0 ? '#4F7942' : '#B85C38',
               borderRadius: 4,
               marginBottom: 4,
@@ -364,7 +450,7 @@ function WeeklyChart({ history, name }) {
   );
 }
 
-// Score Summary Chart
+// Score Summary
 function ScoreSummary({ scores, weeklyScores }) {
   return (
     <div style={{ padding: 16, background: '#F9F6F2', borderRadius: 12, marginBottom: 16 }}>
@@ -389,13 +475,10 @@ function CategoryProgress({ history, name }) {
   
   const catStats = Object.entries(behaviorsByCategory).map(([catName, cat]) => {
     const total = cat.items.length;
-    const completed = cat.items.filter(item => 
-      todayHistory.some(h => h.id === item.id + '-pos' || h.id === item.id + '-neg')
-    ).length;
     const positive = cat.items.filter(item => 
       todayHistory.some(h => h.id === item.id + '-pos')
     ).length;
-    return { name: catName, total, completed, positive, color: cat.color, textColor: cat.textColor };
+    return { name: catName, total, positive };
   });
 
   return (
@@ -417,7 +500,7 @@ function CategoryProgress({ history, name }) {
 }
 
 // Child Panel
-function ChildPanel({ name, scores, weeklyScores, history, dailyStates, avatar, onRecord, onUndo, onReset, onAvatarUpload, loading, side }) {
+function ChildPanel({ name, scores, weeklyScores, history, dailyStates, avatar, onRecord, onUndo, onReset, onAvatarUpload, loading, isAdmin, panelId }) {
   const score = scores[name] || 0;
   const weeklyScore = weeklyScores[name] || 0;
   const childHistory = history[name] || [];
@@ -437,7 +520,7 @@ function ChildPanel({ name, scores, weeklyScores, history, dailyStates, avatar, 
   };
 
   return (
-    <div className="fade-in side-panel" style={{ 
+    <div id={panelId} className="fade-in side-panel" style={{ 
       background: 'white', borderRadius: 20, 
       boxShadow: '0 8px 32px rgba(74,74,74,0.1)', 
       border: hasRestrictions ? '3px solid #B85C38' : '1px solid #E5D4B7',
@@ -448,7 +531,7 @@ function ChildPanel({ name, scores, weeklyScores, history, dailyStates, avatar, 
         background: `linear-gradient(135deg, ${getColor(score)} 0%, ${getColor(score)}dd 100%)`, 
         padding: '20px 16px', textAlign: 'center', color: 'white' 
       }}>
-        <Avatar name={name} avatar={avatar} onUpload={onAvatarUpload} size={70} />
+        <Avatar name={name} avatar={avatar} onUpload={onAvatarUpload} size={70} isAdmin={isAdmin} />
         <h2 style={{ margin: '10px 0 4px', fontSize: '1.4rem', fontWeight: 600 }}>{name}</h2>
         <div style={{ fontSize: '2.2rem', fontWeight: 700 }}>{score}</div>
         <div style={{ fontSize: '0.85rem', opacity: 0.9 }}>points total</div>
@@ -460,6 +543,11 @@ function ChildPanel({ name, scores, weeklyScores, history, dailyStates, avatar, 
             Week: <strong>{weeklyScore >= 0 ? '+' : ''}{weeklyScore}</strong>
           </span>
         </div>
+        {!isAdmin && (
+          <div style={{ marginTop: 10, padding: '6px 12px', background: 'rgba(255,255,255,0.2)', borderRadius: 8, fontSize: '0.75rem', display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+            <Icon name="Eye" size={12} color="white" /> View Only
+          </div>
+        )}
       </div>
 
       <div style={{ padding: 12 }}>
@@ -472,6 +560,22 @@ function ChildPanel({ name, scores, weeklyScores, history, dailyStates, avatar, 
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
               {activeRestrictions.map(r => (
                 <span key={r.threshold} style={{ padding: '3px 8px', background: 'white', borderRadius: 6, color: '#B85C38', fontSize: '0.7rem', fontWeight: 500 }}>
+                  {r.label}
+                </span>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Rewards Available */}
+        {score >= 20 && !hasRestrictions && (
+          <div style={{ background: '#FEF7ED', border: '1px solid #FCD9B6', borderRadius: 10, padding: 10, marginBottom: 12 }}>
+            <div style={{ fontWeight: 600, color: '#92400E', marginBottom: 4, fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: 4 }}>
+              <Icon name="Gift" size={14} color="#C9A882" /> Rewards Available!
+            </div>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+              {rewards.filter(r => score >= r.points).slice(0, 3).map(r => (
+                <span key={r.id} style={{ padding: '3px 8px', background: 'white', borderRadius: 6, color: '#92400E', fontSize: '0.7rem', fontWeight: 500 }}>
                   {r.label}
                 </span>
               ))}
@@ -512,7 +616,8 @@ function ChildPanel({ name, scores, weeklyScores, history, dailyStates, avatar, 
                         dailyState={childDailyState[item.id]}
                         onAdd={handleAdd} 
                         onSubtract={handleSubtract} 
-                        loading={loading} 
+                        loading={loading}
+                        isAdmin={isAdmin}
                       />
                     ))}
                   </div>
@@ -522,39 +627,41 @@ function ChildPanel({ name, scores, weeklyScores, history, dailyStates, avatar, 
           })}
         </div>
 
-        {/* Actions */}
-        <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
-          <button onClick={() => onUndo(name)} disabled={!childHistory.length || loading} style={{
-            flex: 1, padding: 10, borderRadius: 10, border: '2px dashed #D4B996',
-            background: childHistory.length ? 'white' : '#F5F5F5',
-            color: childHistory.length ? '#6B7280' : '#B0B0B0',
-            cursor: childHistory.length ? 'pointer' : 'not-allowed',
-            fontSize: '0.8rem', fontWeight: 500, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6
-          }}>
-            <Icon name="Undo2" size={14} /> Undo
-          </button>
-          <button onClick={() => onReset(name)} style={{
-            flex: 1, padding: 10, borderRadius: 10, border: 'none',
-            background: '#FEF2F2', color: '#B85C38', fontSize: '0.8rem', fontWeight: 500,
-            cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6
-          }}>
-            <Icon name="RotateCcw" size={14} /> Reset {name}
-          </button>
-        </div>
+        {/* Admin Actions */}
+        {isAdmin && (
+          <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
+            <button onClick={() => onUndo(name)} disabled={!childHistory.length || loading} style={{
+              flex: 1, padding: 10, borderRadius: 10, border: '2px dashed #D4B996',
+              background: childHistory.length ? 'white' : '#F5F5F5',
+              color: childHistory.length ? '#6B7280' : '#B0B0B0',
+              cursor: childHistory.length ? 'pointer' : 'not-allowed',
+              fontSize: '0.8rem', fontWeight: 500, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6
+            }}>
+              <Icon name="Undo2" size={14} /> Undo
+            </button>
+            <button onClick={() => onReset(name)} style={{
+              flex: 1, padding: 10, borderRadius: 10, border: 'none',
+              background: '#FEF2F2', color: '#B85C38', fontSize: '0.8rem', fontWeight: 500,
+              cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6
+            }}>
+              <Icon name="RotateCcw" size={14} /> Reset
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );
 }
 
-// Center Panel with Charts
+// Center Panel
 function CenterPanel({ scores, weeklyScores, history, claimed }) {
   const [view, setView] = useState('charts');
   
   return (
-    <div className="fade-in center-panel" style={{ 
+    <div id="center-panel" className="fade-in center-panel" style={{ 
       flex: 1, minWidth: 280, maxWidth: 400, display: 'flex', flexDirection: 'column', gap: 16 
     }}>
-      {/* Date Header */}
+      {/* Date */}
       <div style={{ 
         background: 'white', borderRadius: 16, padding: 16, textAlign: 'center',
         boxShadow: '0 4px 16px rgba(74,74,74,0.08)', border: '1px solid #E5D4B7'
@@ -585,24 +692,16 @@ function CenterPanel({ scores, weeklyScores, history, claimed }) {
           boxShadow: '0 4px 16px rgba(74,74,74,0.08)', border: '1px solid #E5D4B7'
         }}>
           <ScoreSummary scores={scores} weeklyScores={weeklyScores} />
-          <div style={{ borderTop: '1px solid #E5D4B7' }}>
-            <WeeklyChart history={history} name="Artin" />
-          </div>
-          <div style={{ borderTop: '1px solid #E5D4B7' }}>
-            <WeeklyChart history={history} name="Aiden" />
-          </div>
-          <div style={{ borderTop: '1px solid #E5D4B7' }}>
-            <CategoryProgress history={history} name="Artin" />
-          </div>
-          <div style={{ borderTop: '1px solid #E5D4B7' }}>
-            <CategoryProgress history={history} name="Aiden" />
-          </div>
+          <div style={{ borderTop: '1px solid #E5D4B7' }}><WeeklyChart history={history} name="Artin" /></div>
+          <div style={{ borderTop: '1px solid #E5D4B7' }}><WeeklyChart history={history} name="Aiden" /></div>
+          <div style={{ borderTop: '1px solid #E5D4B7' }}><CategoryProgress history={history} name="Artin" /></div>
+          <div style={{ borderTop: '1px solid #E5D4B7' }}><CategoryProgress history={history} name="Aiden" /></div>
         </div>
       )}
 
       {view === 'rewards' && (
         <div style={{ 
-          background: 'white', borderRadius: 16, padding: 16, overflow: 'hidden',
+          background: 'white', borderRadius: 16, padding: 16,
           boxShadow: '0 4px 16px rgba(74,74,74,0.08)', border: '1px solid #E5D4B7',
           maxHeight: 500, overflowY: 'auto'
         }}>
@@ -631,7 +730,7 @@ function CenterPanel({ scores, weeklyScores, history, claimed }) {
                         <div style={{ fontSize: '0.7rem', color: '#888' }}>{r.points} pts</div>
                       </div>
                       {done && <Icon name="Check" size={16} color="#4F7942" />}
-                      {!done && can && <span style={{ fontSize: '0.7rem', color: '#C9A882', fontWeight: 600 }}>Available!</span>}
+                      {!done && can && <span style={{ fontSize: '0.7rem', color: '#4F7942', fontWeight: 600 }}>✓ Available</span>}
                       {!done && !can && <span style={{ fontSize: '0.7rem', color: '#999' }}>{r.points - (scores[name] || 0)} more</span>}
                     </div>
                   );
@@ -670,9 +769,50 @@ function CenterPanel({ scores, weeklyScores, history, claimed }) {
   );
 }
 
+// Mobile Navigation
+function MobileNav({ avatars }) {
+  const scrollTo = (id) => {
+    document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  };
+
+  return (
+    <div className="mobile-nav">
+      <button 
+        onClick={() => scrollTo('artin-panel')}
+        style={{ background: 'linear-gradient(135deg, #87CEEB 0%, #6BB8D9 100%)', color: '#2C3E50' }}
+      >
+        {avatars.Artin ? (
+          <img src={avatars.Artin} alt="Artin" style={{ width: 24, height: 24, borderRadius: '50%', objectFit: 'cover' }} />
+        ) : (
+          <Icon name="User" size={18} color="#2C3E50" />
+        )}
+        Artin
+      </button>
+      <button 
+        onClick={() => scrollTo('center-panel')}
+        style={{ background: 'linear-gradient(135deg, #C9A882 0%, #A8916B 100%)', color: 'white' }}
+      >
+        <Icon name="BarChart3" size={18} color="white" />
+        Charts
+      </button>
+      <button 
+        onClick={() => scrollTo('aiden-panel')}
+        style={{ background: 'linear-gradient(135deg, #4F7942 0%, #6B8E4E 100%)', color: 'white' }}
+      >
+        {avatars.Aiden ? (
+          <img src={avatars.Aiden} alt="Aiden" style={{ width: 24, height: 24, borderRadius: '50%', objectFit: 'cover' }} />
+        ) : (
+          <Icon name="User" size={18} color="white" />
+        )}
+        Aiden
+      </button>
+    </div>
+  );
+}
+
 // Main App
 function App() {
-  const [auth, setAuth] = useState(() => localStorage.getItem('bt_auth') === '1');
+  const [authMode, setAuthMode] = useState(() => localStorage.getItem('bt_auth'));
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [scores, setScores] = useState({ Artin: 0, Aiden: 0 });
@@ -683,9 +823,10 @@ function App() {
   const [avatars, setAvatars] = useState({ Artin: null, Aiden: null });
   const [lastDate, setLastDate] = useState(today());
 
-  useEffect(() => { if (auth) loadData(); }, [auth]);
+  const isAdmin = authMode === 'admin';
 
-  // Check for new day
+  useEffect(() => { if (authMode) loadData(); }, [authMode]);
+
   useEffect(() => {
     const checkDay = () => {
       const currentDay = today();
@@ -700,17 +841,11 @@ function App() {
 
   const loadData = async () => {
     setLoading(true);
-    
-    // Load avatars from localStorage
     const savedAvatars = localStorage.getItem('bt_avatars');
     if (savedAvatars) setAvatars(JSON.parse(savedAvatars));
-    
-    // Load daily states
     const savedStates = localStorage.getItem('bt_daily_states');
     const savedDate = localStorage.getItem('bt_daily_date');
-    if (savedStates && savedDate === today()) {
-      setDailyStates(JSON.parse(savedStates));
-    }
+    if (savedStates && savedDate === today()) setDailyStates(JSON.parse(savedStates));
 
     try {
       const data = await api.getData();
@@ -721,7 +856,7 @@ function App() {
         setClaimed(data.claimed || { Artin: [], Aiden: [] });
       }
     } catch (e) { 
-      const saved = localStorage.getItem('bt_data_v5');
+      const saved = localStorage.getItem('bt_data_v7');
       if (saved) {
         const data = JSON.parse(saved);
         setScores(data.scores || { Artin: 0, Aiden: 0 });
@@ -733,28 +868,25 @@ function App() {
     setLoading(false);
   };
 
-  // Save to localStorage
   useEffect(() => {
-    if (auth && !loading) {
-      localStorage.setItem('bt_data_v5', JSON.stringify({ scores, weeklyScores, history, claimed }));
+    if (authMode && !loading) {
+      localStorage.setItem('bt_data_v7', JSON.stringify({ scores, weeklyScores, history, claimed }));
       localStorage.setItem('bt_daily_states', JSON.stringify(dailyStates));
       localStorage.setItem('bt_daily_date', today());
     }
-  }, [scores, weeklyScores, history, claimed, dailyStates, auth, loading]);
+  }, [scores, weeklyScores, history, claimed, dailyStates, authMode, loading]);
 
   const handleAvatarUpload = (name, dataUrl) => {
+    if (!isAdmin) return;
     const newAvatars = { ...avatars, [name]: dataUrl };
     setAvatars(newAvatars);
     localStorage.setItem('bt_avatars', JSON.stringify(newAvatars));
   };
 
   const record = async (child, behavior) => {
-    // Check if already recorded for today
+    if (!isAdmin) return;
     const behaviorId = behavior.behaviorId;
-    if (dailyStates[child]?.[behaviorId]) {
-      // Already recorded, don't allow
-      return;
-    }
+    if (dailyStates[child]?.[behaviorId]) return;
 
     setSaving(true);
     const entry = { ...behavior, timestamp: new Date().toISOString(), date: today() };
@@ -762,17 +894,14 @@ function App() {
     setScores(s => ({ ...s, [child]: s[child] + behavior.points }));
     setWeeklyScores(s => ({ ...s, [child]: s[child] + behavior.points }));
     setHistory(h => ({ ...h, [child]: [entry, ...h[child]] }));
-    setDailyStates(ds => ({
-      ...ds,
-      [child]: { ...ds[child], [behaviorId]: behavior.type }
-    }));
+    setDailyStates(ds => ({ ...ds, [child]: { ...ds[child], [behaviorId]: behavior.type } }));
 
     try { await api.recordBehavior(child, behavior); } catch (e) { console.error(e); }
     setSaving(false);
   };
 
   const undo = async (child) => {
-    if (!history[child]?.length) return;
+    if (!isAdmin || !history[child]?.length) return;
     setSaving(true);
     const last = history[child][0];
     
@@ -780,7 +909,6 @@ function App() {
     setWeeklyScores(s => ({ ...s, [child]: s[child] - last.points }));
     setHistory(h => ({ ...h, [child]: h[child].slice(1) }));
     
-    // Remove from daily states if it was today
     if (last.date === today() && last.behaviorId) {
       setDailyStates(ds => {
         const newState = { ...ds[child] };
@@ -794,6 +922,7 @@ function App() {
   };
 
   const resetChild = async (child) => {
+    if (!isAdmin) return;
     if (!confirm(`Reset ${child}'s score and history? This cannot be undone.`)) return;
     
     setScores(s => ({ ...s, [child]: 0 }));
@@ -805,9 +934,9 @@ function App() {
     try { await api.resetChild(child); } catch (e) { console.error(e); }
   };
 
-  const logout = () => { localStorage.removeItem('bt_auth'); setAuth(false); };
+  const logout = () => { localStorage.removeItem('bt_auth'); setAuthMode(null); };
 
-  if (!auth) return <PasswordScreen onUnlock={() => setAuth(true)} />;
+  if (!authMode) return <PasswordScreen onUnlock={(mode) => setAuthMode(mode)} />;
   
   if (loading) return (
     <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -822,72 +951,58 @@ function App() {
     <div style={{ minHeight: '100vh' }}>
       {/* Header */}
       <header style={{ 
-        background: 'linear-gradient(135deg, #4F7942 0%, #6B8E4E 100%)', 
-        padding: '12px 20px', color: 'white', 
+        background: isAdmin 
+          ? 'linear-gradient(135deg, #4F7942 0%, #6B8E4E 100%)' 
+          : 'linear-gradient(135deg, #87CEEB 0%, #6BB8D9 100%)', 
+        padding: '12px 20px', color: isAdmin ? 'white' : '#2C3E50', 
         display: 'flex', justifyContent: 'space-between', alignItems: 'center',
         position: 'sticky', top: 0, zIndex: 100
       }}>
         <div>
-          <h1 style={{ margin: 0, fontSize: '1.3rem' }}>Behavior Tracker</h1>
-          {saving && <span style={{ fontSize: '0.75rem', opacity: 0.9 }}>💾 Saving...</span>}
+          <h1 style={{ margin: 0, fontSize: '1.2rem', display: 'flex', alignItems: 'center', gap: 8 }}>
+            {isAdmin ? <Icon name="Shield" size={18} /> : <Icon name="Eye" size={18} />}
+            Behavior Tracker
+          </h1>
+          <div style={{ fontSize: '0.7rem', opacity: 0.9, marginTop: 2 }}>
+            {isAdmin ? '👨 Admin Mode' : '👦 Viewer Mode'}
+            {saving && ' • 💾 Saving...'}
+          </div>
         </div>
         <button onClick={logout} style={{
           padding: '8px 14px', borderRadius: 8, border: 'none',
-          background: 'rgba(255,255,255,0.2)', color: 'white',
+          background: 'rgba(255,255,255,0.2)', color: isAdmin ? 'white' : '#2C3E50',
           fontSize: '0.85rem', fontWeight: 500, cursor: 'pointer',
           display: 'flex', alignItems: 'center', gap: 6
         }}>
-          <Icon name="LogOut" size={16} color="white" /> Lock
+          <Icon name="LogOut" size={16} /> Lock
         </button>
       </header>
 
-      {/* Main Content - 3 Panel Layout */}
+      {/* Mobile Nav */}
+      <MobileNav avatars={avatars} />
+
+      {/* Main */}
       <main className="three-panel" style={{ 
         display: 'flex', gap: 20, padding: 20, maxWidth: 1400, margin: '0 auto',
         alignItems: 'flex-start'
       }}>
-        {/* Left Panel - Artin */}
         <ChildPanel 
-          name="Artin" 
-          scores={scores} 
-          weeklyScores={weeklyScores}
-          history={history}
-          dailyStates={dailyStates}
-          avatar={avatars.Artin}
-          onRecord={record}
-          onUndo={undo}
-          onReset={resetChild}
-          onAvatarUpload={handleAvatarUpload}
-          loading={saving}
-          side="left"
+          name="Artin" panelId="artin-panel"
+          scores={scores} weeklyScores={weeklyScores} history={history}
+          dailyStates={dailyStates} avatar={avatars.Artin}
+          onRecord={record} onUndo={undo} onReset={resetChild}
+          onAvatarUpload={handleAvatarUpload} loading={saving} isAdmin={isAdmin}
         />
-
-        {/* Center Panel - Charts */}
-        <CenterPanel 
-          scores={scores}
-          weeklyScores={weeklyScores}
-          history={history}
-          claimed={claimed}
-        />
-
-        {/* Right Panel - Aiden */}
+        <CenterPanel scores={scores} weeklyScores={weeklyScores} history={history} claimed={claimed} />
         <ChildPanel 
-          name="Aiden" 
-          scores={scores} 
-          weeklyScores={weeklyScores}
-          history={history}
-          dailyStates={dailyStates}
-          avatar={avatars.Aiden}
-          onRecord={record}
-          onUndo={undo}
-          onReset={resetChild}
-          onAvatarUpload={handleAvatarUpload}
-          loading={saving}
-          side="right"
+          name="Aiden" panelId="aiden-panel"
+          scores={scores} weeklyScores={weeklyScores} history={history}
+          dailyStates={dailyStates} avatar={avatars.Aiden}
+          onRecord={record} onUndo={undo} onReset={resetChild}
+          onAvatarUpload={handleAvatarUpload} loading={saving} isAdmin={isAdmin}
         />
       </main>
 
-      {/* Footer */}
       <footer style={{ textAlign: 'center', padding: 16, color: '#888', fontSize: '0.8rem' }}>
         ☁️ Synced with Google Sheets
       </footer>
