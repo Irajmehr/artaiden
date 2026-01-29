@@ -22,7 +22,7 @@
       color: #4A4A4A;
     }
     h1, h2, h3, h4 { font-family: 'Playfair Display', Georgia, serif; }
-    ::-webkit-scrollbar { width: 5px; }
+    ::-webkit-scrollbar { width: 6px; }
     ::-webkit-scrollbar-track { background: #E5D4B7; }
     ::-webkit-scrollbar-thumb { background: #A8916B; border-radius: 3px; }
     @keyframes spin { to { transform: rotate(360deg); } }
@@ -31,20 +31,20 @@
     .mobile-nav { display: none; }
     @media (max-width: 1024px) {
       .three-panel { flex-direction: column !important; align-items: center !important; }
-      .side-panel { min-width: 100% !important; max-width: 500px !important; width: 100% !important; }
-      .center-panel { order: -1 !important; min-width: 100% !important; max-width: 500px !important; }
+      .side-panel { min-width: 100% !important; max-width: 600px !important; width: 100% !important; }
+      .center-panel { order: -1 !important; min-width: 100% !important; max-width: 600px !important; }
       .mobile-nav { 
-        display: flex !important; position: sticky; top: 44px; z-index: 99;
-        background: white; padding: 8px 12px; gap: 6px;
+        display: flex !important; position: sticky; top: 56px; z-index: 99;
+        background: white; padding: 10px 16px; gap: 8px;
         border-bottom: 1px solid #E5D4B7; justify-content: center;
       }
       .mobile-nav button {
-        flex: 1; max-width: 110px; padding: 8px 10px; border-radius: 10px;
-        border: none; font-weight: 600; font-size: 0.8rem; cursor: pointer;
-        display: flex; align-items: center; justify-content: center; gap: 5px;
+        flex: 1; max-width: 140px; padding: 12px 14px; border-radius: 12px;
+        border: none; font-weight: 600; font-size: 1rem; cursor: pointer;
+        display: flex; align-items: center; justify-content: center; gap: 6px;
       }
     }
-    @media (max-width: 768px) { html { font-size: 14px; } }
+    @media (max-width: 768px) { html { font-size: 15px; } }
   </style>
 </head>
 <body>
@@ -57,7 +57,7 @@ const GOOGLE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxuEp2AwHSV3r
 const VIEWER_PASSWORD = 'artaiden';
 const ADMIN_PASSWORD = '8006005';
 
-const Icon = ({ name, size = 20, color = 'currentColor' }) => {
+const Icon = ({ name, size = 24, color = 'currentColor' }) => {
   const ref = useRef(null);
   useEffect(() => {
     if (ref.current && lucide.icons[name]) {
@@ -144,23 +144,18 @@ const behaviorsByCategory = {
   }
 };
 
-// All behavior IDs for lookup
 const allBehaviorIds = [];
 Object.values(behaviorsByCategory).forEach(cat => cat.items.forEach(item => allBehaviorIds.push(item.id)));
 
-// Rewards - Weekday max 30min, Weekend max 60min game time
 const isWeekend = () => { const d = new Date().getDay(); return d === 0 || d === 6; };
 
 const rewards = [
-  // Weekday game rewards (max 30 min total/day)
   { id: 'game10', points: 15, label: '10 min Game', icon: 'Gamepad2', category: 'game' },
   { id: 'game15', points: 25, label: '15 min Game', icon: 'Gamepad2', category: 'game' },
   { id: 'game20', points: 35, label: '20 min Game', icon: 'Gamepad', category: 'game' },
   { id: 'game30', points: 50, label: '30 min Game ⭐', icon: 'Gamepad', category: 'game' },
-  // Weekend bonus game rewards (max 60 min total/day)
   { id: 'game45', points: 75, label: '45 min Game 🎮', icon: 'Trophy', category: 'game-weekend' },
   { id: 'game60', points: 100, label: '60 min Game 🎮', icon: 'Trophy', category: 'game-weekend' },
-  // Non-game rewards
   { id: 'tv30', points: 30, label: '30 min TV', icon: 'Tv', category: 'other' },
   { id: 'snack', points: 40, label: 'Special Snack', icon: 'Popcorn', category: 'other' },
   { id: 'movie', points: 60, label: 'Movie Night', icon: 'Film', category: 'other' },
@@ -176,7 +171,6 @@ const restrictions = [
   { threshold: -30, label: 'Early Bed', icon: 'Moon' },
 ];
 
-// Use LOCAL date
 const today = () => {
   const d = new Date();
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
@@ -197,18 +191,11 @@ const getMonthStart = () => {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-01`;
 };
 
-// FIXED: Extract base behavior ID from "wake-pos" or "no-fighting-neg" -> "wake" or "no-fighting"
 const extractBehaviorId = (entry) => {
   let bid = entry.behaviorId || entry.id || '';
-  
-  // First, try to match against known behavior IDs
   for (const knownId of allBehaviorIds) {
-    if (bid === knownId || bid.startsWith(knownId + '-')) {
-      return knownId;
-    }
+    if (bid === knownId || bid.startsWith(knownId + '-')) return knownId;
   }
-  
-  // Fallback: strip -pos/-neg and any trailing numbers/timestamps
   bid = bid.replace(/-pos$/, '').replace(/-neg$/, '').replace(/-pos-.*$/, '').replace(/-neg-.*$/, '');
   return bid;
 };
@@ -258,7 +245,6 @@ const calculateTodayScores = (history) => {
   return scores;
 };
 
-// Build daily states
 const buildDailyStates = (history) => {
   const todayStr = today();
   const states = { Artin: {}, Aiden: {} };
@@ -275,15 +261,12 @@ const buildDailyStates = (history) => {
   return states;
 };
 
-// API
 const api = {
   async getData() {
     try {
       const res = await fetch(`${GOOGLE_SCRIPT_URL}?action=getData`);
       return res.json();
-    } catch (e) {
-      return null;
-    }
+    } catch (e) { return null; }
   },
   async recordBehavior(child, behavior) {
     try { return fetch(GOOGLE_SCRIPT_URL + '?action=recordBehavior', { method: 'POST', body: JSON.stringify({ child, behavior }) }).then(r => r.json()); }
@@ -303,7 +286,6 @@ const api = {
   }
 };
 
-// Password Screen
 function PasswordScreen({ onUnlock }) {
   const [pw, setPw] = useState('');
   const [err, setErr] = useState(false);
@@ -316,24 +298,23 @@ function PasswordScreen({ onUnlock }) {
   };
   
   return (
-    <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
-      <div style={{ background: 'white', borderRadius: 16, padding: '32px 28px', boxShadow: '0 12px 40px rgba(74,74,74,0.15)', textAlign: 'center', maxWidth: 340, width: '100%', border: '1px solid #E5D4B7' }}>
-        <div style={{ width: 60, height: 60, borderRadius: '50%', background: 'linear-gradient(135deg, #C9A882 0%, #A8916B 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px' }}>
-          <Icon name="Lock" size={28} color="white" />
+    <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
+      <div style={{ background: 'white', borderRadius: 20, padding: '40px 36px', boxShadow: '0 16px 48px rgba(74,74,74,0.15)', textAlign: 'center', maxWidth: 400, width: '100%', border: '1px solid #E5D4B7' }}>
+        <div style={{ width: 80, height: 80, borderRadius: '50%', background: 'linear-gradient(135deg, #C9A882 0%, #A8916B 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 20px' }}>
+          <Icon name="Lock" size={36} color="white" />
         </div>
-        <h1 style={{ margin: '0 0 4px', color: '#4A4A4A', fontSize: '1.5rem' }}>Behavior Tracker</h1>
-        <p style={{ color: '#888', marginBottom: 20, fontSize: '0.9rem' }}>Enter password</p>
+        <h1 style={{ margin: '0 0 6px', color: '#4A4A4A', fontSize: '1.9rem' }}>Behavior Tracker</h1>
+        <p style={{ color: '#888', marginBottom: 24, fontSize: '1.1rem' }}>Enter password</p>
         <form onSubmit={submit}>
-          <input type="password" value={pw} onChange={e => setPw(e.target.value)} placeholder="Password" style={{ width: '100%', padding: '12px 16px', borderRadius: 8, border: `2px solid ${err ? '#B85C38' : '#E5D4B7'}`, fontSize: '1rem', marginBottom: 12, outline: 'none' }} />
-          {err && <p style={{ color: '#B85C38', marginBottom: 10, fontSize: '0.85rem' }}>Incorrect password</p>}
-          <button type="submit" style={{ width: '100%', padding: '12px', borderRadius: 8, border: 'none', background: 'linear-gradient(135deg, #4F7942 0%, #6B8E4E 100%)', color: 'white', fontSize: '1rem', fontWeight: 600, cursor: 'pointer' }}>Enter</button>
+          <input type="password" value={pw} onChange={e => setPw(e.target.value)} placeholder="Password" style={{ width: '100%', padding: '16px 20px', borderRadius: 10, border: `2px solid ${err ? '#B85C38' : '#E5D4B7'}`, fontSize: '1.1rem', marginBottom: 16, outline: 'none' }} />
+          {err && <p style={{ color: '#B85C38', marginBottom: 12, fontSize: '1rem' }}>Incorrect password</p>}
+          <button type="submit" style={{ width: '100%', padding: '16px', borderRadius: 10, border: 'none', background: 'linear-gradient(135deg, #4F7942 0%, #6B8E4E 100%)', color: 'white', fontSize: '1.15rem', fontWeight: 600, cursor: 'pointer' }}>Enter</button>
         </form>
       </div>
     </div>
   );
 }
 
-// Avatar (100px - 3x bigger than original ~33px)
 function Avatar({ name, avatar, onUpload, isAdmin }) {
   const inputRef = useRef(null);
   const handleUpload = (e) => {
@@ -347,18 +328,18 @@ function Avatar({ name, avatar, onUpload, isAdmin }) {
   };
 
   return (
-    <div style={{ position: 'relative', width: 90, height: 90, flexShrink: 0 }}>
+    <div style={{ position: 'relative', width: 110, height: 110, flexShrink: 0 }}>
       <div onClick={() => isAdmin && inputRef.current?.click()} style={{
         width: '100%', height: '100%', borderRadius: '50%', overflow: 'hidden',
         background: avatar ? 'none' : 'linear-gradient(135deg, rgba(255,255,255,0.3) 0%, rgba(255,255,255,0.1) 100%)',
         display: 'flex', alignItems: 'center', justifyContent: 'center',
-        cursor: isAdmin ? 'pointer' : 'default', border: '3px solid rgba(255,255,255,0.5)', boxShadow: '0 4px 16px rgba(0,0,0,0.2)'
+        cursor: isAdmin ? 'pointer' : 'default', border: '4px solid rgba(255,255,255,0.5)', boxShadow: '0 6px 20px rgba(0,0,0,0.2)'
       }}>
-        {avatar ? <img src={avatar} alt={name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <Icon name="User" size={40} color="rgba(255,255,255,0.8)" />}
+        {avatar ? <img src={avatar} alt={name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <Icon name="User" size={50} color="rgba(255,255,255,0.8)" />}
       </div>
       {isAdmin && (
-        <div style={{ position: 'absolute', bottom: 0, right: 0, width: 26, height: 26, borderRadius: '50%', background: '#4F7942', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '2px solid white', cursor: 'pointer' }} onClick={() => inputRef.current?.click()}>
-          <Icon name="Camera" size={12} color="white" />
+        <div style={{ position: 'absolute', bottom: 2, right: 2, width: 32, height: 32, borderRadius: '50%', background: '#4F7942', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '2px solid white', cursor: 'pointer' }} onClick={() => inputRef.current?.click()}>
+          <Icon name="Camera" size={16} color="white" />
         </div>
       )}
       <input ref={inputRef} type="file" accept="image/*" onChange={handleUpload} style={{ display: 'none' }} />
@@ -366,51 +347,50 @@ function Avatar({ name, avatar, onUpload, isAdmin }) {
   );
 }
 
-// Behavior Row
 function BehaviorRow({ item, dailyState, onRecord, loading, isAdmin }) {
   const state = dailyState || null;
   
   return (
     <div style={{ 
-      display: 'flex', alignItems: 'center', gap: 6, padding: '8px 6px', 
-      borderRadius: 8, marginBottom: 3,
+      display: 'flex', alignItems: 'center', gap: 10, padding: '12px 10px', 
+      borderRadius: 12, marginBottom: 5,
       background: state === 'positive' ? '#E8F5E9' : state === 'negative' ? '#FFEBEE' : '#FAFAFA',
       border: state ? `2px solid ${state === 'positive' ? '#4F7942' : '#B85C38'}` : '1px solid #E5D4B7',
     }}>
       {isAdmin ? (
         <button onClick={() => !loading && onRecord(item, 'negative')} className="btn-bounce" style={{
-          width: 34, height: 34, borderRadius: 8, border: state === 'negative' ? '2px solid #8B0000' : 'none',
+          width: 44, height: 44, borderRadius: 10, border: state === 'negative' ? '2px solid #8B0000' : 'none',
           background: state === 'negative' ? '#B85C38' : '#E57373',
           color: 'white', cursor: loading ? 'default' : 'pointer',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
           opacity: state === 'positive' ? 0.3 : 1, flexShrink: 0,
           transform: state === 'negative' ? 'scale(1.08)' : 'scale(1)',
         }}>
-          {state === 'negative' ? <Icon name="Check" size={16} color="white" /> : <Icon name="Minus" size={16} color="white" />}
+          {state === 'negative' ? <Icon name="Check" size={20} color="white" /> : <Icon name="Minus" size={20} color="white" />}
         </button>
       ) : (
-        <div style={{ width: 28, height: 28, borderRadius: 6, background: state === 'negative' ? '#B85C38' : '#E5D4B7', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-          {state === 'negative' && <Icon name="X" size={12} color="white" />}
+        <div style={{ width: 36, height: 36, borderRadius: 8, background: state === 'negative' ? '#B85C38' : '#E5D4B7', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+          {state === 'negative' && <Icon name="X" size={16} color="white" />}
         </div>
       )}
 
-      <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 }}>
+      <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
         <div style={{ 
-          width: 30, height: 30, borderRadius: 6, flexShrink: 0,
+          width: 40, height: 40, borderRadius: 10, flexShrink: 0,
           background: state === 'positive' ? '#4F7942' : state === 'negative' ? '#B85C38' : '#F0EBE5', 
           display: 'flex', alignItems: 'center', justifyContent: 'center'
         }}>
-          <Icon name={item.icon} size={15} color={state ? 'white' : '#A8916B'} />
+          <Icon name={item.icon} size={20} color={state ? 'white' : '#A8916B'} />
         </div>
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ 
-            fontWeight: 600, fontSize: '0.8rem',
+            fontWeight: 600, fontSize: '1rem',
             color: state === 'positive' ? '#2D5A2E' : state === 'negative' ? '#8B0000' : '#4A4A4A',
             whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis'
           }}>
             {state === 'positive' ? '✓ ' + item.posLabel : state === 'negative' ? '✗ ' + item.negLabel : item.label}
           </div>
-          <div style={{ fontSize: '0.65rem', color: state === 'positive' ? '#4F7942' : state === 'negative' ? '#B85C38' : '#888', fontWeight: state ? 600 : 400 }}>
+          <div style={{ fontSize: '0.85rem', color: state === 'positive' ? '#4F7942' : state === 'negative' ? '#B85C38' : '#888', fontWeight: state ? 600 : 400 }}>
             {state === 'positive' ? '+' + item.points : state === 'negative' ? '-' + item.points : '±' + item.points} pts
           </div>
         </div>
@@ -418,25 +398,24 @@ function BehaviorRow({ item, dailyState, onRecord, loading, isAdmin }) {
 
       {isAdmin ? (
         <button onClick={() => !loading && onRecord(item, 'positive')} className="btn-bounce" style={{
-          width: 34, height: 34, borderRadius: 8, border: state === 'positive' ? '2px solid #2D5A2E' : 'none',
+          width: 44, height: 44, borderRadius: 10, border: state === 'positive' ? '2px solid #2D5A2E' : 'none',
           background: state === 'positive' ? '#4F7942' : '#66BB6A',
           color: 'white', cursor: loading ? 'default' : 'pointer',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
           opacity: state === 'negative' ? 0.3 : 1, flexShrink: 0,
           transform: state === 'positive' ? 'scale(1.08)' : 'scale(1)',
         }}>
-          {state === 'positive' ? <Icon name="Check" size={16} color="white" /> : <Icon name="Plus" size={16} color="white" />}
+          {state === 'positive' ? <Icon name="Check" size={20} color="white" /> : <Icon name="Plus" size={20} color="white" />}
         </button>
       ) : (
-        <div style={{ width: 28, height: 28, borderRadius: 6, background: state === 'positive' ? '#4F7942' : '#E5D4B7', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-          {state === 'positive' && <Icon name="Check" size={12} color="white" />}
+        <div style={{ width: 36, height: 36, borderRadius: 8, background: state === 'positive' ? '#4F7942' : '#E5D4B7', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+          {state === 'positive' && <Icon name="Check" size={16} color="white" />}
         </div>
       )}
     </div>
   );
 }
 
-// COMPACT Child Panel
 function ChildPanel({ name, scores, weeklyScores, todayScores, history, dailyStates, avatar, onRecord, onUndo, onReset, onAvatarUpload, loading, isAdmin, panelId }) {
   const score = scores[name] || 0;
   const weeklyScore = weeklyScores[name] || 0;
@@ -452,89 +431,87 @@ function ChildPanel({ name, scores, weeklyScores, todayScores, history, dailySta
 
   return (
     <div id={panelId} className="side-panel" style={{ 
-      background: 'white', borderRadius: 14, 
-      boxShadow: '0 4px 20px rgba(74,74,74,0.08)', 
+      background: 'white', borderRadius: 18, 
+      boxShadow: '0 6px 24px rgba(74,74,74,0.1)', 
       border: hasRestrictions ? '3px solid #B85C38' : '1px solid #E5D4B7',
-      overflow: 'hidden', minWidth: 320, maxWidth: 380, flex: 1
+      overflow: 'hidden', minWidth: 380, maxWidth: 460, flex: 1
     }}>
-      {/* COMPACT Header - horizontal layout */}
       <div style={{ 
         background: `linear-gradient(135deg, ${getColor(score)} 0%, ${getColor(score)}cc 100%)`, 
-        padding: '10px 12px', color: 'white',
-        display: 'flex', alignItems: 'center', gap: 12
+        padding: '14px 16px', color: 'white',
+        display: 'flex', alignItems: 'center', gap: 16
       }}>
         <Avatar name={name} avatar={avatar} onUpload={onAvatarUpload} isAdmin={isAdmin} />
         <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
-            <h2 style={{ margin: 0, fontSize: '1.3rem', fontWeight: 600 }}>{name}</h2>
-            <span style={{ fontSize: '1.6rem', fontWeight: 700 }}>{score}</span>
-            <span style={{ fontSize: '0.8rem', opacity: 0.9 }}>pts</span>
+          <div style={{ display: 'flex', alignItems: 'baseline', gap: 10 }}>
+            <h2 style={{ margin: 0, fontSize: '1.6rem', fontWeight: 600 }}>{name}</h2>
+            <span style={{ fontSize: '2rem', fontWeight: 700 }}>{score}</span>
+            <span style={{ fontSize: '1rem', opacity: 0.9 }}>pts</span>
           </div>
-          <div style={{ display: 'flex', gap: 6, marginTop: 4, flexWrap: 'wrap' }}>
-            <span style={{ background: 'rgba(255,255,255,0.2)', padding: '2px 6px', borderRadius: 6, fontSize: '0.7rem' }}>
+          <div style={{ display: 'flex', gap: 8, marginTop: 6, flexWrap: 'wrap' }}>
+            <span style={{ background: 'rgba(255,255,255,0.2)', padding: '4px 10px', borderRadius: 8, fontSize: '0.9rem' }}>
               Today: <b>{todayScore >= 0 ? '+' : ''}{todayScore}</b>
             </span>
-            <span style={{ background: 'rgba(255,255,255,0.2)', padding: '2px 6px', borderRadius: 6, fontSize: '0.7rem' }}>
+            <span style={{ background: 'rgba(255,255,255,0.2)', padding: '4px 10px', borderRadius: 8, fontSize: '0.9rem' }}>
               Week: <b>{weeklyScore >= 0 ? '+' : ''}{weeklyScore}</b>
             </span>
-            <span style={{ background: 'rgba(255,255,255,0.2)', padding: '2px 6px', borderRadius: 6, fontSize: '0.7rem' }}>
+            <span style={{ background: 'rgba(255,255,255,0.2)', padding: '4px 10px', borderRadius: 8, fontSize: '0.9rem' }}>
               {totalCompleted}/{totalBehaviors}
             </span>
           </div>
           {!isAdmin && (
-            <div style={{ marginTop: 4, fontSize: '0.65rem', opacity: 0.8, display: 'flex', alignItems: 'center', gap: 3 }}>
-              <Icon name="Eye" size={10} color="white" /> View Only
+            <div style={{ marginTop: 6, fontSize: '0.85rem', opacity: 0.8, display: 'flex', alignItems: 'center', gap: 4 }}>
+              <Icon name="Eye" size={14} color="white" /> View Only
             </div>
           )}
         </div>
       </div>
 
-      <div style={{ padding: 8 }}>
+      <div style={{ padding: 12 }}>
         {hasRestrictions && (
-          <div style={{ background: '#FEF2F2', border: '1px solid #FECACA', borderRadius: 6, padding: 6, marginBottom: 6, display: 'flex', alignItems: 'center', gap: 4, flexWrap: 'wrap' }}>
-            <Icon name="AlertTriangle" size={12} color="#B85C38" />
-            {activeRestrictions.map(r => (<span key={r.threshold} style={{ padding: '1px 5px', background: 'white', borderRadius: 4, color: '#B85C38', fontSize: '0.65rem', fontWeight: 500 }}>{r.label}</span>))}
+          <div style={{ background: '#FEF2F2', border: '1px solid #FECACA', borderRadius: 10, padding: 10, marginBottom: 10, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+            <Icon name="AlertTriangle" size={18} color="#B85C38" />
+            {activeRestrictions.map(r => (<span key={r.threshold} style={{ padding: '3px 8px', background: 'white', borderRadius: 6, color: '#B85C38', fontSize: '0.85rem', fontWeight: 500 }}>{r.label}</span>))}
           </div>
         )}
 
         {score >= 15 && !hasRestrictions && (
-          <div style={{ background: '#FEF7ED', border: '1px solid #FCD9B6', borderRadius: 6, padding: 6, marginBottom: 6, display: 'flex', alignItems: 'center', gap: 4 }}>
-            <Icon name="Gift" size={12} color="#C9A882" />
-            <span style={{ fontSize: '0.7rem', color: '#92400E', fontWeight: 500 }}>Rewards available!</span>
+          <div style={{ background: '#FEF7ED', border: '1px solid #FCD9B6', borderRadius: 10, padding: 10, marginBottom: 10, display: 'flex', alignItems: 'center', gap: 8 }}>
+            <Icon name="Gift" size={18} color="#C9A882" />
+            <span style={{ fontSize: '0.95rem', color: '#92400E', fontWeight: 500 }}>Rewards available!</span>
           </div>
         )}
 
         {isAdmin && (
-          <div style={{ background: '#E3F2FD', borderRadius: 5, padding: '4px 6px', marginBottom: 6, fontSize: '0.65rem', color: '#1565C0', display: 'flex', alignItems: 'center', gap: 3 }}>
-            <Icon name="Info" size={10} color="#1565C0" /> Tap +/- to assign or swap
+          <div style={{ background: '#E3F2FD', borderRadius: 8, padding: '8px 10px', marginBottom: 10, fontSize: '0.9rem', color: '#1565C0', display: 'flex', alignItems: 'center', gap: 6 }}>
+            <Icon name="Info" size={16} color="#1565C0" /> Tap +/- to assign or swap
           </div>
         )}
 
-        {/* Categories */}
-        <div style={{ maxHeight: 'calc(100vh - 280px)', overflowY: 'auto' }}>
+        <div style={{ maxHeight: 'calc(100vh - 320px)', overflowY: 'auto' }}>
           {Object.entries(behaviorsByCategory).map(([catName, cat]) => {
             const completedCount = cat.items.filter(item => childDailyState[item.id]).length;
             const positiveCount = cat.items.filter(item => childDailyState[item.id] === 'positive').length;
             const negativeCount = cat.items.filter(item => childDailyState[item.id] === 'negative').length;
             
             return (
-              <div key={catName} style={{ marginBottom: 4 }}>
+              <div key={catName} style={{ marginBottom: 6 }}>
                 <button onClick={() => setExpandedCat(expandedCat === catName ? null : catName)} style={{ 
                   width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', 
-                  padding: '6px 8px', background: cat.color, borderRadius: 6, border: 'none', cursor: 'pointer' 
+                  padding: '10px 12px', background: cat.color, borderRadius: 10, border: 'none', cursor: 'pointer' 
                 }}>
-                  <span style={{ display: 'flex', alignItems: 'center', gap: 5, fontWeight: 600, color: cat.textColor, fontSize: '0.8rem' }}>
-                    <Icon name={cat.icon} size={14} color={cat.textColor} />{catName}
+                  <span style={{ display: 'flex', alignItems: 'center', gap: 8, fontWeight: 600, color: cat.textColor, fontSize: '1rem' }}>
+                    <Icon name={cat.icon} size={20} color={cat.textColor} />{catName}
                   </span>
-                  <span style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-                    {positiveCount > 0 && <span style={{ color: '#4F7942', fontSize: '0.65rem', fontWeight: 600 }}>+{positiveCount}</span>}
-                    {negativeCount > 0 && <span style={{ color: '#B85C38', fontSize: '0.65rem', fontWeight: 600 }}>-{negativeCount}</span>}
-                    <span style={{ fontSize: '0.7rem', color: cat.textColor, fontWeight: 600, background: completedCount > 0 ? 'rgba(255,255,255,0.5)' : 'transparent', padding: '1px 4px', borderRadius: 3 }}>{completedCount}/{cat.items.length}</span>
-                    <Icon name={expandedCat === catName ? 'ChevronUp' : 'ChevronDown'} size={14} color={cat.textColor} />
+                  <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    {positiveCount > 0 && <span style={{ color: '#4F7942', fontSize: '0.85rem', fontWeight: 600 }}>+{positiveCount}</span>}
+                    {negativeCount > 0 && <span style={{ color: '#B85C38', fontSize: '0.85rem', fontWeight: 600 }}>-{negativeCount}</span>}
+                    <span style={{ fontSize: '0.9rem', color: cat.textColor, fontWeight: 600, background: completedCount > 0 ? 'rgba(255,255,255,0.5)' : 'transparent', padding: '2px 8px', borderRadius: 6 }}>{completedCount}/{cat.items.length}</span>
+                    <Icon name={expandedCat === catName ? 'ChevronUp' : 'ChevronDown'} size={20} color={cat.textColor} />
                   </span>
                 </button>
                 {expandedCat === catName && (
-                  <div style={{ paddingTop: 4 }}>
+                  <div style={{ paddingTop: 8 }}>
                     {cat.items.map(item => (
                       <BehaviorRow 
                         key={item.id} 
@@ -553,12 +530,12 @@ function ChildPanel({ name, scores, weeklyScores, todayScores, history, dailySta
         </div>
 
         {isAdmin && (
-          <div style={{ display: 'flex', gap: 6, marginTop: 8 }}>
-            <button onClick={() => onUndo(name)} disabled={!childHistory.length || loading} style={{ flex: 1, padding: 8, borderRadius: 6, border: '1px dashed #D4B996', background: childHistory.length ? 'white' : '#F5F5F5', color: childHistory.length ? '#666' : '#bbb', cursor: childHistory.length ? 'pointer' : 'not-allowed', fontSize: '0.75rem', fontWeight: 500, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 3 }}>
-              <Icon name="Undo2" size={12} /> Undo
+          <div style={{ display: 'flex', gap: 10, marginTop: 12 }}>
+            <button onClick={() => onUndo(name)} disabled={!childHistory.length || loading} style={{ flex: 1, padding: 12, borderRadius: 10, border: '1px dashed #D4B996', background: childHistory.length ? 'white' : '#F5F5F5', color: childHistory.length ? '#666' : '#bbb', cursor: childHistory.length ? 'pointer' : 'not-allowed', fontSize: '0.95rem', fontWeight: 500, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+              <Icon name="Undo2" size={18} /> Undo
             </button>
-            <button onClick={() => onReset(name)} style={{ flex: 1, padding: 8, borderRadius: 6, border: 'none', background: '#FFEBEE', color: '#B85C38', fontSize: '0.75rem', fontWeight: 500, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 3 }}>
-              <Icon name="RotateCcw" size={12} /> Reset
+            <button onClick={() => onReset(name)} style={{ flex: 1, padding: 12, borderRadius: 10, border: 'none', background: '#FFEBEE', color: '#B85C38', fontSize: '0.95rem', fontWeight: 500, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+              <Icon name="RotateCcw" size={18} /> Reset
             </button>
           </div>
         )}
@@ -567,73 +544,72 @@ function ChildPanel({ name, scores, weeklyScores, todayScores, history, dailySta
   );
 }
 
-// Center Panel
 function CenterPanel({ scores, weeklyScores, history, dailyStates, claimHistory, onClaimReward, isAdmin }) {
   const [view, setView] = useState('charts');
   const monthlyScores = useMemo(() => calculateMonthlyScores(history), [history]);
   const weekend = isWeekend();
   
   return (
-    <div id="center-panel" className="center-panel" style={{ flex: 1, minWidth: 240, maxWidth: 320, display: 'flex', flexDirection: 'column', gap: 8 }}>
-      <div style={{ background: 'white', borderRadius: 10, padding: 8, textAlign: 'center', boxShadow: '0 2px 8px rgba(0,0,0,0.06)', border: '1px solid #E5D4B7' }}>
-        <div style={{ fontSize: '0.95rem', fontWeight: 600, color: '#4A4A4A' }}>{formatDate()}</div>
-        {weekend && <div style={{ fontSize: '0.65rem', color: '#4F7942', marginTop: 2 }}>🎮 Weekend - 60min game max!</div>}
+    <div id="center-panel" className="center-panel" style={{ flex: 1, minWidth: 300, maxWidth: 400, display: 'flex', flexDirection: 'column', gap: 12 }}>
+      <div style={{ background: 'white', borderRadius: 14, padding: 12, textAlign: 'center', boxShadow: '0 3px 12px rgba(0,0,0,0.06)', border: '1px solid #E5D4B7' }}>
+        <div style={{ fontSize: '1.2rem', fontWeight: 600, color: '#4A4A4A' }}>{formatDate()}</div>
+        {weekend && <div style={{ fontSize: '0.85rem', color: '#4F7942', marginTop: 3 }}>🎮 Weekend - 60min game max!</div>}
       </div>
 
-      <div style={{ display: 'flex', gap: 3 }}>
+      <div style={{ display: 'flex', gap: 6 }}>
         {[['charts', 'BarChart3'], ['rewards', 'Gift'], ['history', 'Clock']].map(([v, icon]) => (
-          <button key={v} onClick={() => setView(v)} style={{ flex: 1, padding: '5px', borderRadius: 5, border: view === v ? 'none' : '1px solid #D4B996', background: view === v ? '#4F7942' : 'white', color: view === v ? 'white' : '#4A4A4A', fontSize: '0.7rem', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 2 }}>
-            <Icon name={icon} size={11} color={view === v ? 'white' : '#4F7942'} /> {v.charAt(0).toUpperCase() + v.slice(1)}
+          <button key={v} onClick={() => setView(v)} style={{ flex: 1, padding: '8px', borderRadius: 8, border: view === v ? 'none' : '1px solid #D4B996', background: view === v ? '#4F7942' : 'white', color: view === v ? 'white' : '#4A4A4A', fontSize: '0.9rem', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4 }}>
+            <Icon name={icon} size={16} color={view === v ? 'white' : '#4F7942'} /> {v.charAt(0).toUpperCase() + v.slice(1)}
           </button>
         ))}
       </div>
 
       {view === 'charts' && (
-        <div style={{ background: 'white', borderRadius: 10, padding: 8, boxShadow: '0 2px 8px rgba(0,0,0,0.06)', border: '1px solid #E5D4B7' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-around', marginBottom: 8 }}>
+        <div style={{ background: 'white', borderRadius: 14, padding: 12, boxShadow: '0 3px 12px rgba(0,0,0,0.06)', border: '1px solid #E5D4B7' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-around', marginBottom: 12 }}>
             {['Artin', 'Aiden'].map(n => (
               <div key={n} style={{ textAlign: 'center' }}>
-                <div style={{ fontSize: '1.4rem', fontWeight: 700, color: getColor(scores[n] || 0) }}>{scores[n] || 0}</div>
-                <div style={{ fontSize: '0.65rem', color: '#888' }}>{n}</div>
-                <div style={{ fontSize: '0.55rem', color: '#aaa' }}>W:{weeklyScores[n]||0} M:{monthlyScores[n]||0}</div>
+                <div style={{ fontSize: '1.8rem', fontWeight: 700, color: getColor(scores[n] || 0) }}>{scores[n] || 0}</div>
+                <div style={{ fontSize: '0.85rem', color: '#888' }}>{n}</div>
+                <div style={{ fontSize: '0.75rem', color: '#aaa' }}>W:{weeklyScores[n]||0} M:{monthlyScores[n]||0}</div>
               </div>
             ))}
           </div>
           
-          <div style={{ borderTop: '1px solid #E5D4B7', paddingTop: 6 }}>
-            <div style={{ fontSize: '0.7rem', fontWeight: 600, color: '#4A4A4A', marginBottom: 4, textAlign: 'center' }}>Weekly: 150 pts</div>
+          <div style={{ borderTop: '1px solid #E5D4B7', paddingTop: 10 }}>
+            <div style={{ fontSize: '0.9rem', fontWeight: 600, color: '#4A4A4A', marginBottom: 8, textAlign: 'center' }}>Weekly: 150 pts</div>
             {['Artin', 'Aiden'].map(n => {
               const ws = weeklyScores[n] || 0;
               const pct = Math.min(100, Math.max(0, (ws / 150) * 100));
               return (
-                <div key={n} style={{ marginBottom: 4 }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.6rem', marginBottom: 1 }}>
+                <div key={n} style={{ marginBottom: 8 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', marginBottom: 3 }}>
                     <span>{n}</span>
                     <span style={{ color: ws >= 150 ? '#4F7942' : '#888' }}>{ws}/150 {ws >= 150 && '🎉'}</span>
                   </div>
-                  <div style={{ height: 5, background: '#E5D4B7', borderRadius: 3 }}>
-                    <div style={{ width: `${pct}%`, height: '100%', background: getColor(ws), borderRadius: 3 }} />
+                  <div style={{ height: 8, background: '#E5D4B7', borderRadius: 4 }}>
+                    <div style={{ width: `${pct}%`, height: '100%', background: getColor(ws), borderRadius: 4 }} />
                   </div>
                 </div>
               );
             })}
           </div>
           
-          <div style={{ borderTop: '1px solid #E5D4B7', paddingTop: 6, marginTop: 6 }}>
-            <div style={{ fontSize: '0.7rem', fontWeight: 600, color: '#4A4A4A', marginBottom: 4, textAlign: 'center' }}>Today</div>
+          <div style={{ borderTop: '1px solid #E5D4B7', paddingTop: 10, marginTop: 10 }}>
+            <div style={{ fontSize: '0.9rem', fontWeight: 600, color: '#4A4A4A', marginBottom: 8, textAlign: 'center' }}>Today</div>
             {['Artin', 'Aiden'].map(n => {
               const state = dailyStates[n] || {};
               const pos = Object.values(state).filter(s => s === 'positive').length;
               const neg = Object.values(state).filter(s => s === 'negative').length;
               const total = Object.values(behaviorsByCategory).reduce((s, c) => s + c.items.length, 0);
               return (
-                <div key={n} style={{ marginBottom: 3, display: 'flex', alignItems: 'center', gap: 4 }}>
-                  <span style={{ fontSize: '0.6rem', width: 35 }}>{n}</span>
-                  <div style={{ flex: 1, height: 6, background: '#E5D4B7', borderRadius: 3, display: 'flex', overflow: 'hidden' }}>
+                <div key={n} style={{ marginBottom: 6, display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <span style={{ fontSize: '0.8rem', width: 45 }}>{n}</span>
+                  <div style={{ flex: 1, height: 10, background: '#E5D4B7', borderRadius: 5, display: 'flex', overflow: 'hidden' }}>
                     <div style={{ width: `${(pos/total)*100}%`, background: '#4F7942' }} />
                     <div style={{ width: `${(neg/total)*100}%`, background: '#B85C38' }} />
                   </div>
-                  <span style={{ fontSize: '0.55rem', color: '#888' }}>{pos+neg}/{total}</span>
+                  <span style={{ fontSize: '0.75rem', color: '#888' }}>{pos+neg}/{total}</span>
                 </div>
               );
             })}
@@ -642,33 +618,33 @@ function CenterPanel({ scores, weeklyScores, history, dailyStates, claimHistory,
       )}
 
       {view === 'rewards' && (
-        <div style={{ background: 'white', borderRadius: 10, padding: 8, boxShadow: '0 2px 8px rgba(0,0,0,0.06)', border: '1px solid #E5D4B7', maxHeight: 350, overflowY: 'auto' }}>
-          <div style={{ fontSize: '0.65rem', color: '#666', marginBottom: 6, textAlign: 'center' }}>
+        <div style={{ background: 'white', borderRadius: 14, padding: 12, boxShadow: '0 3px 12px rgba(0,0,0,0.06)', border: '1px solid #E5D4B7', maxHeight: 450, overflowY: 'auto' }}>
+          <div style={{ fontSize: '0.85rem', color: '#666', marginBottom: 10, textAlign: 'center' }}>
             {weekend ? '🎮 Weekend: Max 60 min/day' : '📅 Weekday: Max 30 min/day'}
           </div>
           {['Artin', 'Aiden'].map(childName => (
-            <div key={childName} style={{ marginBottom: 10 }}>
-              <div style={{ fontSize: '0.8rem', fontWeight: 600, marginBottom: 4, display: 'flex', alignItems: 'center', gap: 3 }}>
-                <div style={{ width: 14, height: 14, borderRadius: '50%', background: getColor(scores[childName]||0) }} />
+            <div key={childName} style={{ marginBottom: 14 }}>
+              <div style={{ fontSize: '1rem', fontWeight: 600, marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
+                <div style={{ width: 18, height: 18, borderRadius: '50%', background: getColor(scores[childName]||0) }} />
                 {childName} ({scores[childName]||0} pts)
               </div>
               {rewards.filter(r => weekend || r.category !== 'game-weekend').map(r => {
                 const can = (scores[childName] || 0) >= r.points;
                 return (
-                  <div key={r.id} style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '5px 6px', marginBottom: 3, borderRadius: 5, background: can ? '#FEF7ED' : '#F5F5F5', border: `1px solid ${can ? '#E5D4B7' : '#EEE'}` }}>
-                    <div style={{ width: 20, height: 20, borderRadius: 4, background: can ? '#C9A882' : '#CCC', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                      <Icon name={r.icon} size={10} color="white" />
+                  <div key={r.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 10px', marginBottom: 5, borderRadius: 8, background: can ? '#FEF7ED' : '#F5F5F5', border: `1px solid ${can ? '#E5D4B7' : '#EEE'}` }}>
+                    <div style={{ width: 28, height: 28, borderRadius: 6, background: can ? '#C9A882' : '#CCC', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      <Icon name={r.icon} size={14} color="white" />
                     </div>
                     <div style={{ flex: 1 }}>
-                      <div style={{ fontSize: '0.7rem', fontWeight: 600, color: '#4A4A4A' }}>{r.label}</div>
-                      <div style={{ fontSize: '0.55rem', color: '#888' }}>{r.points} pts</div>
+                      <div style={{ fontSize: '0.9rem', fontWeight: 600, color: '#4A4A4A' }}>{r.label}</div>
+                      <div style={{ fontSize: '0.75rem', color: '#888' }}>{r.points} pts</div>
                     </div>
                     {can && isAdmin ? (
-                      <button onClick={() => onClaimReward(childName, r)} style={{ padding: '3px 6px', borderRadius: 4, border: 'none', background: '#4F7942', color: 'white', fontSize: '0.6rem', fontWeight: 600, cursor: 'pointer' }}>Claim</button>
+                      <button onClick={() => onClaimReward(childName, r)} style={{ padding: '6px 12px', borderRadius: 6, border: 'none', background: '#4F7942', color: 'white', fontSize: '0.8rem', fontWeight: 600, cursor: 'pointer' }}>Claim</button>
                     ) : can ? (
-                      <span style={{ fontSize: '0.55rem', color: '#4F7942' }}>✓</span>
+                      <span style={{ fontSize: '0.75rem', color: '#4F7942' }}>✓</span>
                     ) : (
-                      <span style={{ fontSize: '0.55rem', color: '#999' }}>{r.points - (scores[childName]||0)}</span>
+                      <span style={{ fontSize: '0.75rem', color: '#999' }}>{r.points - (scores[childName]||0)}</span>
                     )}
                   </div>
                 );
@@ -679,27 +655,27 @@ function CenterPanel({ scores, weeklyScores, history, dailyStates, claimHistory,
       )}
 
       {view === 'history' && (
-        <div style={{ background: 'white', borderRadius: 10, padding: 8, boxShadow: '0 2px 8px rgba(0,0,0,0.06)', border: '1px solid #E5D4B7' }}>
+        <div style={{ background: 'white', borderRadius: 14, padding: 12, boxShadow: '0 3px 12px rgba(0,0,0,0.06)', border: '1px solid #E5D4B7' }}>
           {(() => {
             const allClaims = [];
             ['Artin', 'Aiden'].forEach(n => (claimHistory[n]||[]).forEach(c => allClaims.push({...c, child: n})));
             allClaims.sort((a,b) => new Date(b.timestamp) - new Date(a.timestamp));
-            if (!allClaims.length) return <div style={{ textAlign: 'center', padding: 16, color: '#888' }}><Icon name="Gift" size={20} color="#D4B996" /><p style={{ marginTop: 6, fontSize: '0.75rem' }}>No rewards claimed</p></div>;
+            if (!allClaims.length) return <div style={{ textAlign: 'center', padding: 24, color: '#888' }}><Icon name="Gift" size={28} color="#D4B996" /><p style={{ marginTop: 10, fontSize: '0.95rem' }}>No rewards claimed</p></div>;
             return (
               <div>
-                <div style={{ fontSize: '0.7rem', fontWeight: 600, marginBottom: 6, textAlign: 'center' }}>Recent Rewards</div>
+                <div style={{ fontSize: '0.95rem', fontWeight: 600, marginBottom: 10, textAlign: 'center' }}>Recent Rewards</div>
                 {allClaims.slice(0,8).map((c,i) => {
                   const reward = rewards.find(r => r.id === c.rewardId);
                   return (
-                    <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '4px 5px', background: '#F9F6F2', borderRadius: 4, marginBottom: 3 }}>
-                      <div style={{ width: 18, height: 18, borderRadius: 4, background: c.child === 'Artin' ? '#87CEEB' : '#4F7942', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                        <Icon name={reward?.icon || 'Gift'} size={9} color="white" />
+                    <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 10px', background: '#F9F6F2', borderRadius: 8, marginBottom: 5 }}>
+                      <div style={{ width: 24, height: 24, borderRadius: 6, background: c.child === 'Artin' ? '#87CEEB' : '#4F7942', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        <Icon name={reward?.icon || 'Gift'} size={12} color="white" />
                       </div>
                       <div style={{ flex: 1 }}>
-                        <div style={{ fontSize: '0.65rem', fontWeight: 600 }}>{c.child}: {reward?.label}</div>
-                        <div style={{ fontSize: '0.5rem', color: '#888' }}>{formatDateTime(c.timestamp)}</div>
+                        <div style={{ fontSize: '0.85rem', fontWeight: 600 }}>{c.child}: {reward?.label}</div>
+                        <div style={{ fontSize: '0.7rem', color: '#888' }}>{formatDateTime(c.timestamp)}</div>
                       </div>
-                      <span style={{ fontSize: '0.55rem', color: '#B85C38' }}>-{reward?.points}</span>
+                      <span style={{ fontSize: '0.75rem', color: '#B85C38' }}>-{reward?.points}</span>
                     </div>
                   );
                 })}
@@ -712,27 +688,25 @@ function CenterPanel({ scores, weeklyScores, history, dailyStates, claimHistory,
   );
 }
 
-// Mobile Nav
 function MobileNav({ avatars }) {
   const scrollTo = (id) => document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   return (
     <div className="mobile-nav">
       <button onClick={() => scrollTo('artin-panel')} style={{ background: '#87CEEB', color: '#2C3E50' }}>
-        {avatars.Artin ? <img src={avatars.Artin} alt="" style={{ width: 18, height: 18, borderRadius: '50%', objectFit: 'cover' }} /> : <Icon name="User" size={14} />}
+        {avatars.Artin ? <img src={avatars.Artin} alt="" style={{ width: 22, height: 22, borderRadius: '50%', objectFit: 'cover' }} /> : <Icon name="User" size={18} />}
         Artin
       </button>
       <button onClick={() => scrollTo('center-panel')} style={{ background: '#C9A882', color: 'white' }}>
-        <Icon name="BarChart3" size={14} /> Stats
+        <Icon name="BarChart3" size={18} /> Stats
       </button>
       <button onClick={() => scrollTo('aiden-panel')} style={{ background: '#4F7942', color: 'white' }}>
-        {avatars.Aiden ? <img src={avatars.Aiden} alt="" style={{ width: 18, height: 18, borderRadius: '50%', objectFit: 'cover' }} /> : <Icon name="User" size={14} />}
+        {avatars.Aiden ? <img src={avatars.Aiden} alt="" style={{ width: 22, height: 22, borderRadius: '50%', objectFit: 'cover' }} /> : <Icon name="User" size={18} />}
         Aiden
       </button>
     </div>
   );
 }
 
-// Main App
 function App() {
   const [authMode, setAuthMode] = useState(() => localStorage.getItem('bt_auth'));
   const [loading, setLoading] = useState(true);
@@ -760,9 +734,9 @@ function App() {
       if (data && data.history) {
         setHistory(data.history);
         setClaimHistory(data.claimHistory || { Artin: [], Aiden: [] });
-        localStorage.setItem('bt_data_v13', JSON.stringify({ history: data.history, claimHistory: data.claimHistory || {} }));
+        localStorage.setItem('bt_data_v14', JSON.stringify({ history: data.history, claimHistory: data.claimHistory || {} }));
       } else {
-        const saved = localStorage.getItem('bt_data_v13');
+        const saved = localStorage.getItem('bt_data_v14');
         if (saved) {
           const localData = JSON.parse(saved);
           setHistory(localData.history || { Artin: [], Aiden: [] });
@@ -770,7 +744,7 @@ function App() {
         }
       }
     } catch (e) { 
-      const saved = localStorage.getItem('bt_data_v13');
+      const saved = localStorage.getItem('bt_data_v14');
       if (saved) {
         const localData = JSON.parse(saved);
         setHistory(localData.history || { Artin: [], Aiden: [] });
@@ -782,7 +756,7 @@ function App() {
 
   useEffect(() => {
     if (authMode && !loading) {
-      localStorage.setItem('bt_data_v13', JSON.stringify({ history, claimHistory }));
+      localStorage.setItem('bt_data_v14', JSON.stringify({ history, claimHistory }));
     }
   }, [history, claimHistory, authMode, loading]);
 
@@ -804,7 +778,6 @@ function App() {
     
     setSaving(true);
     
-    // Remove existing entry for this behavior today
     const newHistory = (history[child] || []).filter(entry => 
       !(entry.date === todayStr && extractBehaviorId(entry) === behaviorId)
     );
@@ -866,8 +839,8 @@ function App() {
   if (loading) return (
     <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
       <div style={{ textAlign: 'center' }}>
-        <span className="spin" style={{ display: 'inline-block' }}><Icon name="Loader2" size={36} color="#C9A882" /></span>
-        <p style={{ marginTop: 10, color: '#888', fontSize: '0.85rem' }}>Loading...</p>
+        <span className="spin" style={{ display: 'inline-block' }}><Icon name="Loader2" size={48} color="#C9A882" /></span>
+        <p style={{ marginTop: 14, color: '#888', fontSize: '1rem' }}>Loading...</p>
       </div>
     </div>
   );
@@ -876,29 +849,29 @@ function App() {
     <div style={{ minHeight: '100vh' }}>
       <header style={{ 
         background: isAdmin ? '#4F7942' : '#87CEEB', 
-        padding: '6px 14px', color: isAdmin ? 'white' : '#2C3E50', 
+        padding: '10px 18px', color: isAdmin ? 'white' : '#2C3E50', 
         display: 'flex', justifyContent: 'space-between', alignItems: 'center',
         position: 'sticky', top: 0, zIndex: 100
       }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-          {isAdmin ? <Icon name="Shield" size={14} /> : <Icon name="Eye" size={14} />}
-          <span style={{ fontWeight: 600, fontSize: '0.9rem' }}>Behavior Tracker</span>
-          {saving && <span style={{ fontSize: '0.65rem', opacity: 0.8 }}>💾</span>}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          {isAdmin ? <Icon name="Shield" size={18} /> : <Icon name="Eye" size={18} />}
+          <span style={{ fontWeight: 600, fontSize: '1.1rem' }}>Behavior Tracker</span>
+          {saving && <span style={{ fontSize: '0.8rem', opacity: 0.8 }}>💾</span>}
         </div>
-        <button onClick={logout} style={{ padding: '5px 8px', borderRadius: 5, border: 'none', background: 'rgba(255,255,255,0.2)', color: isAdmin ? 'white' : '#2C3E50', fontSize: '0.75rem', fontWeight: 500, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 3 }}>
-          <Icon name="LogOut" size={12} /> Lock
+        <button onClick={logout} style={{ padding: '8px 12px', borderRadius: 8, border: 'none', background: 'rgba(255,255,255,0.2)', color: isAdmin ? 'white' : '#2C3E50', fontSize: '0.95rem', fontWeight: 500, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 5 }}>
+          <Icon name="LogOut" size={16} /> Lock
         </button>
       </header>
 
       <MobileNav avatars={avatars} />
 
-      <main className="three-panel" style={{ display: 'flex', gap: 12, padding: 12, maxWidth: 1200, margin: '0 auto', alignItems: 'flex-start' }}>
+      <main className="three-panel" style={{ display: 'flex', gap: 16, padding: 16, maxWidth: 1400, margin: '0 auto', alignItems: 'flex-start' }}>
         <ChildPanel name="Artin" panelId="artin-panel" scores={scores} weeklyScores={weeklyScores} todayScores={todayScores} history={history} dailyStates={dailyStates} avatar={avatars.Artin} onRecord={record} onUndo={undo} onReset={resetChild} onAvatarUpload={handleAvatarUpload} loading={saving} isAdmin={isAdmin} />
         <CenterPanel scores={scores} weeklyScores={weeklyScores} history={history} dailyStates={dailyStates} claimHistory={claimHistory} onClaimReward={claimReward} isAdmin={isAdmin} />
         <ChildPanel name="Aiden" panelId="aiden-panel" scores={scores} weeklyScores={weeklyScores} todayScores={todayScores} history={history} dailyStates={dailyStates} avatar={avatars.Aiden} onRecord={record} onUndo={undo} onReset={resetChild} onAvatarUpload={handleAvatarUpload} loading={saving} isAdmin={isAdmin} />
       </main>
 
-      <footer style={{ textAlign: 'center', padding: 10, color: '#888', fontSize: '0.7rem' }}>☁️ Synced</footer>
+      <footer style={{ textAlign: 'center', padding: 14, color: '#888', fontSize: '0.85rem' }}>☁️ Synced</footer>
     </div>
   );
 }
