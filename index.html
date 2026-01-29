@@ -193,14 +193,20 @@ const restrictions = [
 const getColor = s => s >= 100 ? '#4F7942' : s >= 50 ? '#6B8E4E' : s >= 20 ? '#87CEEB' : s >= 0 ? '#C9A882' : s >= -20 ? '#D4966B' : '#B85C38';
 const today = () => new Date().toISOString().split('T')[0];
 const formatDate = () => new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
+const formatDateTime = (ts) => new Date(ts).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
 const getWeekStart = () => {
   const d = new Date();
   d.setHours(0, 0, 0, 0);
   d.setDate(d.getDate() - d.getDay());
   return d.toISOString().split('T')[0];
 };
+const getMonthStart = () => {
+  const d = new Date();
+  d.setDate(1);
+  return d.toISOString().split('T')[0];
+};
 
-// Calculate scores from history (single source of truth)
+// Calculate scores from history
 const calculateScores = (history) => {
   const scores = { Artin: 0, Aiden: 0 };
   ['Artin', 'Aiden'].forEach(name => {
@@ -209,31 +215,33 @@ const calculateScores = (history) => {
   return scores;
 };
 
-// Calculate weekly scores from history
 const calculateWeeklyScores = (history) => {
   const weekStart = getWeekStart();
   const scores = { Artin: 0, Aiden: 0 };
   ['Artin', 'Aiden'].forEach(name => {
-    scores[name] = (history[name] || [])
-      .filter(h => h.date >= weekStart)
-      .reduce((sum, h) => sum + h.points, 0);
+    scores[name] = (history[name] || []).filter(h => h.date >= weekStart).reduce((sum, h) => sum + h.points, 0);
   });
   return scores;
 };
 
-// Calculate today's scores from history
+const calculateMonthlyScores = (history) => {
+  const monthStart = getMonthStart();
+  const scores = { Artin: 0, Aiden: 0 };
+  ['Artin', 'Aiden'].forEach(name => {
+    scores[name] = (history[name] || []).filter(h => h.date >= monthStart).reduce((sum, h) => sum + h.points, 0);
+  });
+  return scores;
+};
+
 const calculateTodayScores = (history) => {
   const todayStr = today();
   const scores = { Artin: 0, Aiden: 0 };
   ['Artin', 'Aiden'].forEach(name => {
-    scores[name] = (history[name] || [])
-      .filter(h => h.date === todayStr)
-      .reduce((sum, h) => sum + h.points, 0);
+    scores[name] = (history[name] || []).filter(h => h.date === todayStr).reduce((sum, h) => sum + h.points, 0);
   });
   return scores;
 };
 
-// Build daily states from history
 const buildDailyStates = (history) => {
   const todayStr = today();
   const states = { Artin: {}, Aiden: {} };
@@ -255,7 +263,7 @@ const api = {
       const res = await fetch(`${GOOGLE_SCRIPT_URL}?action=getData`);
       return res.json();
     } catch (e) {
-      const saved = localStorage.getItem('bt_data_v8');
+      const saved = localStorage.getItem('bt_data_v9');
       return saved ? JSON.parse(saved) : null;
     }
   },
@@ -269,6 +277,10 @@ const api = {
   },
   async resetChild(child) {
     try { return fetch(GOOGLE_SCRIPT_URL + '?action=resetChild', { method: 'POST', body: JSON.stringify({ child }) }).then(r => r.json()); }
+    catch (e) { return { success: true }; }
+  },
+  async claimReward(child, reward) {
+    try { return fetch(GOOGLE_SCRIPT_URL + '?action=claimReward', { method: 'POST', body: JSON.stringify({ child, reward }) }).then(r => r.json()); }
     catch (e) { return { success: true }; }
   }
 };
@@ -349,9 +361,15 @@ function Avatar({ name, avatar, onUpload, size = 80, isAdmin }) {
   );
 }
 
-// Behavior Row
-function BehaviorRow({ item, dailyState, onAdd, onSubtract, loading, isAdmin }) {
+// Behavior Row - Now allows swapping!
+function BehaviorRow({ item, dailyState, onRecord, loading, isAdmin }) {
   const state = dailyState || null;
+  
+  const handleClick = (type) => {
+    if (!isAdmin || loading) return;
+    // Always allow clicking - will swap if different type
+    onRecord(item, type);
+  };
   
   return (
     <div style={{ 
@@ -361,14 +379,22 @@ function BehaviorRow({ item, dailyState, onAdd, onSubtract, loading, isAdmin }) 
       borderRadius: state ? 8 : 0, marginBottom: 2
     }}>
       {isAdmin ? (
-        <button onClick={() => onSubtract(item)} disabled={loading || state === 'negative'} className="btn-bounce" style={{
-          width: 36, height: 36, borderRadius: 10, border: 'none',
-          background: state === 'negative' ? '#B85C38' : 'linear-gradient(135deg, #B85C38 0%, #D4714D 100%)',
-          color: 'white', cursor: loading || state === 'negative' ? 'default' : 'pointer',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          opacity: state === 'negative' ? 1 : state === 'positive' ? 0.4 : 1,
-          boxShadow: state === 'negative' ? 'none' : '0 2px 8px rgba(184,92,56,0.25)', flexShrink: 0
-        }}>
+        <button 
+          onClick={() => handleClick('negative')} 
+          disabled={loading} 
+          className="btn-bounce" 
+          style={{
+            width: 36, height: 36, borderRadius: 10, border: state === 'negative' ? '3px solid #8B0000' : 'none',
+            background: state === 'negative' ? '#B85C38' : 'linear-gradient(135deg, #B85C38 0%, #D4714D 100%)',
+            color: 'white', cursor: loading ? 'default' : 'pointer',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            opacity: state === 'positive' ? 0.5 : 1,
+            boxShadow: state === 'negative' ? '0 0 0 2px #8B0000' : '0 2px 8px rgba(184,92,56,0.25)', 
+            flexShrink: 0,
+            transition: 'all 0.15s'
+          }}
+          title={state === 'positive' ? 'Click to change to negative' : ''}
+        >
           {state === 'negative' ? <Icon name="Check" size={18} color="white" /> : <Icon name="Minus" size={18} color="white" />}
         </button>
       ) : (
@@ -390,14 +416,22 @@ function BehaviorRow({ item, dailyState, onAdd, onSubtract, loading, isAdmin }) 
       </div>
 
       {isAdmin ? (
-        <button onClick={() => onAdd(item)} disabled={loading || state === 'positive'} className="btn-bounce" style={{
-          width: 36, height: 36, borderRadius: 10, border: 'none',
-          background: state === 'positive' ? '#4F7942' : 'linear-gradient(135deg, #4F7942 0%, #6B8E4E 100%)',
-          color: 'white', cursor: loading || state === 'positive' ? 'default' : 'pointer',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          opacity: state === 'positive' ? 1 : state === 'negative' ? 0.4 : 1,
-          boxShadow: state === 'positive' ? 'none' : '0 2px 8px rgba(79,121,66,0.25)', flexShrink: 0
-        }}>
+        <button 
+          onClick={() => handleClick('positive')} 
+          disabled={loading} 
+          className="btn-bounce" 
+          style={{
+            width: 36, height: 36, borderRadius: 10, border: state === 'positive' ? '3px solid #2D5A2E' : 'none',
+            background: state === 'positive' ? '#4F7942' : 'linear-gradient(135deg, #4F7942 0%, #6B8E4E 100%)',
+            color: 'white', cursor: loading ? 'default' : 'pointer',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            opacity: state === 'negative' ? 0.5 : 1,
+            boxShadow: state === 'positive' ? '0 0 0 2px #2D5A2E' : '0 2px 8px rgba(79,121,66,0.25)', 
+            flexShrink: 0,
+            transition: 'all 0.15s'
+          }}
+          title={state === 'negative' ? 'Click to change to positive' : ''}
+        >
           {state === 'positive' ? <Icon name="Check" size={18} color="white" /> : <Icon name="Plus" size={18} color="white" />}
         </button>
       ) : (
@@ -427,22 +461,46 @@ function WeeklyChart({ history, name }) {
   const maxAbs = Math.max(50, ...days.map(d => Math.abs(d.points)));
   
   return (
-    <div style={{ padding: 16 }}>
-      <h4 style={{ margin: '0 0 12px', fontSize: '0.9rem', color: '#4A4A4A', textAlign: 'center' }}>{name}'s Week</h4>
-      <div style={{ display: 'flex', alignItems: 'end', justifyContent: 'space-between', height: 100, gap: 4 }}>
+    <div style={{ padding: 12 }}>
+      <h4 style={{ margin: '0 0 10px', fontSize: '0.85rem', color: '#4A4A4A', textAlign: 'center' }}>{name}'s Week</h4>
+      <div style={{ display: 'flex', alignItems: 'end', justifyContent: 'space-between', height: 80, gap: 4 }}>
         {days.map((d, i) => (
           <div key={i} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', flex: 1 }}>
-            <div style={{ 
-              width: '100%', maxWidth: 30, 
-              height: Math.max(4, Math.abs(d.points) / maxAbs * 60),
-              background: d.points >= 0 ? '#4F7942' : '#B85C38',
-              borderRadius: 4, marginBottom: 4, opacity: d.isToday ? 1 : 0.7
-            }} />
-            <span style={{ fontSize: '0.65rem', color: d.isToday ? '#4A4A4A' : '#888', fontWeight: d.isToday ? 600 : 400 }}>{d.day}</span>
-            <span style={{ fontSize: '0.6rem', color: d.points >= 0 ? '#4F7942' : '#B85C38' }}>{d.points >= 0 ? '+' : ''}{d.points}</span>
+            <div style={{ width: '100%', maxWidth: 24, height: Math.max(4, Math.abs(d.points) / maxAbs * 50), background: d.points >= 0 ? '#4F7942' : '#B85C38', borderRadius: 3, marginBottom: 4, opacity: d.isToday ? 1 : 0.7 }} />
+            <span style={{ fontSize: '0.6rem', color: d.isToday ? '#4A4A4A' : '#888', fontWeight: d.isToday ? 600 : 400 }}>{d.day}</span>
+            <span style={{ fontSize: '0.55rem', color: d.points >= 0 ? '#4F7942' : '#B85C38' }}>{d.points >= 0 ? '+' : ''}{d.points}</span>
           </div>
         ))}
       </div>
+    </div>
+  );
+}
+
+// Monthly Progress
+function MonthlyProgress({ history }) {
+  const monthlyScores = useMemo(() => calculateMonthlyScores(history), [history]);
+  const monthName = new Date().toLocaleDateString('en-US', { month: 'long' });
+  const goal = 500; // Monthly goal
+  
+  return (
+    <div style={{ padding: 12, borderTop: '1px solid #E5D4B7' }}>
+      <h4 style={{ margin: '0 0 10px', fontSize: '0.85rem', color: '#4A4A4A', textAlign: 'center' }}>{monthName} Progress</h4>
+      {['Artin', 'Aiden'].map(name => {
+        const score = monthlyScores[name] || 0;
+        const pct = Math.min(100, Math.max(0, (score / goal) * 100));
+        return (
+          <div key={name} style={{ marginBottom: 8 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 3 }}>
+              <span style={{ fontSize: '0.75rem', fontWeight: 600, color: '#4A4A4A' }}>{name}</span>
+              <span style={{ fontSize: '0.75rem', color: score >= 0 ? '#4F7942' : '#B85C38' }}>{score} pts {score >= goal && '🏆'}</span>
+            </div>
+            <div style={{ height: 8, background: '#E5D4B7', borderRadius: 4, overflow: 'hidden' }}>
+              <div style={{ width: `${pct}%`, height: '100%', background: `linear-gradient(90deg, ${getColor(score)} 0%, ${getColor(score)}cc 100%)`, borderRadius: 4 }} />
+            </div>
+          </div>
+        );
+      })}
+      <p style={{ fontSize: '0.65rem', color: '#888', textAlign: 'center', marginTop: 6 }}>Monthly Goal: {goal} pts</p>
     </div>
   );
 }
@@ -450,14 +508,14 @@ function WeeklyChart({ history, name }) {
 // Score Summary
 function ScoreSummary({ scores, weeklyScores }) {
   return (
-    <div style={{ padding: 16, background: '#F9F6F2', borderRadius: 12, marginBottom: 16 }}>
-      <h4 style={{ margin: '0 0 16px', fontSize: '1rem', color: '#4A4A4A', textAlign: 'center' }}>Score Comparison</h4>
+    <div style={{ padding: 12, background: '#F9F6F2', borderRadius: 10, marginBottom: 12 }}>
+      <h4 style={{ margin: '0 0 12px', fontSize: '0.9rem', color: '#4A4A4A', textAlign: 'center' }}>Total Scores</h4>
       <div style={{ display: 'flex', justifyContent: 'space-around' }}>
         {['Artin', 'Aiden'].map(name => (
           <div key={name} style={{ textAlign: 'center' }}>
-            <div style={{ fontSize: '2rem', fontWeight: 700, color: getColor(scores[name] || 0) }}>{scores[name] || 0}</div>
-            <div style={{ fontSize: '0.8rem', color: '#888' }}>{name}</div>
-            <div style={{ fontSize: '0.7rem', color: '#aaa', marginTop: 4 }}>Week: {weeklyScores[name] || 0}</div>
+            <div style={{ fontSize: '1.8rem', fontWeight: 700, color: getColor(scores[name] || 0) }}>{scores[name] || 0}</div>
+            <div style={{ fontSize: '0.75rem', color: '#888' }}>{name}</div>
+            <div style={{ fontSize: '0.65rem', color: '#aaa', marginTop: 2 }}>Week: {weeklyScores[name] || 0}</div>
           </div>
         ))}
       </div>
@@ -465,7 +523,7 @@ function ScoreSummary({ scores, weeklyScores }) {
   );
 }
 
-// Category Progress - uses dailyStates for consistency
+// Category Progress
 function CategoryProgress({ dailyStates, name }) {
   const childState = dailyStates[name] || {};
   
@@ -479,19 +537,57 @@ function CategoryProgress({ dailyStates, name }) {
   }, [childState]);
 
   return (
-    <div style={{ padding: 16 }}>
-      <h4 style={{ margin: '0 0 12px', fontSize: '0.9rem', color: '#4A4A4A', textAlign: 'center' }}>{name}'s Today</h4>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+    <div style={{ padding: 12 }}>
+      <h4 style={{ margin: '0 0 10px', fontSize: '0.85rem', color: '#4A4A4A', textAlign: 'center' }}>{name}'s Today</h4>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
         {catStats.map(cat => (
-          <div key={cat.name} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <span style={{ fontSize: '0.7rem', color: '#888', width: 70, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{cat.name}</span>
-            <div style={{ flex: 1, height: 8, background: '#E5D4B7', borderRadius: 4, overflow: 'hidden', display: 'flex' }}>
+          <div key={cat.name} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <span style={{ fontSize: '0.65rem', color: '#888', width: 65, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{cat.name}</span>
+            <div style={{ flex: 1, height: 6, background: '#E5D4B7', borderRadius: 3, overflow: 'hidden', display: 'flex' }}>
               <div style={{ width: `${(cat.positive / cat.total) * 100}%`, height: '100%', background: '#4F7942' }} />
               <div style={{ width: `${(cat.negative / cat.total) * 100}%`, height: '100%', background: '#B85C38' }} />
             </div>
-            <span style={{ fontSize: '0.65rem', color: '#888', width: 30 }}>{cat.completed}/{cat.total}</span>
+            <span style={{ fontSize: '0.6rem', color: '#888', width: 28 }}>{cat.completed}/{cat.total}</span>
           </div>
         ))}
+      </div>
+    </div>
+  );
+}
+
+// Reward Claim History
+function RewardHistory({ claimHistory }) {
+  const allClaims = useMemo(() => {
+    const claims = [];
+    ['Artin', 'Aiden'].forEach(name => {
+      (claimHistory[name] || []).forEach(c => {
+        claims.push({ ...c, child: name });
+      });
+    });
+    return claims.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp)).slice(0, 10);
+  }, [claimHistory]);
+
+  if (!allClaims.length) return null;
+
+  return (
+    <div style={{ padding: 12, borderTop: '1px solid #E5D4B7' }}>
+      <h4 style={{ margin: '0 0 10px', fontSize: '0.85rem', color: '#4A4A4A', textAlign: 'center' }}>Recent Rewards Claimed</h4>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 6, maxHeight: 150, overflowY: 'auto' }}>
+        {allClaims.map((c, i) => {
+          const reward = rewards.find(r => r.id === c.rewardId);
+          return (
+            <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 8px', background: '#F9F6F2', borderRadius: 6 }}>
+              <div style={{ width: 24, height: 24, borderRadius: 6, background: c.child === 'Artin' ? '#87CEEB' : '#4F7942', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <Icon name={reward?.icon || 'Gift'} size={12} color="white" />
+              </div>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontSize: '0.75rem', fontWeight: 600, color: '#4A4A4A' }}>{c.child}: {reward?.label || c.rewardId}</div>
+                <div style={{ fontSize: '0.6rem', color: '#888' }}>{formatDateTime(c.timestamp)}</div>
+              </div>
+              <span style={{ fontSize: '0.65rem', color: '#C9A882' }}>-{reward?.points || 0}</span>
+            </div>
+          );
+        })}
       </div>
     </div>
   );
@@ -508,12 +604,8 @@ function ChildPanel({ name, scores, weeklyScores, todayScores, history, dailySta
   const hasRestrictions = activeRestrictions.length > 0;
   const [expandedCat, setExpandedCat] = useState('Punctuality');
 
-  const handleAdd = (item) => {
-    onRecord(name, { id: item.id + '-pos', label: item.posLabel, points: item.points, type: 'positive', behaviorId: item.id });
-  };
-
-  const handleSubtract = (item) => {
-    onRecord(name, { id: item.id + '-neg', label: item.negLabel, points: -item.points, type: 'negative', behaviorId: item.id });
+  const handleRecord = (item, type) => {
+    onRecord(name, item, type);
   };
 
   return (
@@ -566,7 +658,14 @@ function ChildPanel({ name, scores, weeklyScores, todayScores, history, dailySta
           </div>
         )}
 
-        <div style={{ maxHeight: 380, overflowY: 'auto' }}>
+        {isAdmin && (
+          <div style={{ background: '#E8F4FD', border: '1px solid #B8D4E8', borderRadius: 8, padding: 8, marginBottom: 12, fontSize: '0.7rem', color: '#2C3E50', display: 'flex', alignItems: 'center', gap: 6 }}>
+            <Icon name="RefreshCw" size={14} color="#2C3E50" />
+            <span>Tap + or - to assign. Tap again to swap.</span>
+          </div>
+        )}
+
+        <div style={{ maxHeight: 350, overflowY: 'auto' }}>
           {Object.entries(behaviorsByCategory).map(([catName, cat]) => {
             const completedCount = cat.items.filter(item => childDailyState[item.id]).length;
             return (
@@ -582,7 +681,7 @@ function ChildPanel({ name, scores, weeklyScores, todayScores, history, dailySta
                 </button>
                 {expandedCat === catName && (
                   <div style={{ paddingTop: 6 }}>
-                    {cat.items.map(item => (<BehaviorRow key={item.id} item={item} dailyState={childDailyState[item.id]} onAdd={handleAdd} onSubtract={handleSubtract} loading={loading} isAdmin={isAdmin} />))}
+                    {cat.items.map(item => (<BehaviorRow key={item.id} item={item} dailyState={childDailyState[item.id]} onRecord={handleRecord} loading={loading} isAdmin={isAdmin} />))}
                   </div>
                 )}
               </div>
@@ -606,55 +705,64 @@ function ChildPanel({ name, scores, weeklyScores, todayScores, history, dailySta
 }
 
 // Center Panel
-function CenterPanel({ scores, weeklyScores, history, dailyStates, claimed }) {
+function CenterPanel({ scores, weeklyScores, history, dailyStates, claimHistory, onClaimReward, isAdmin }) {
   const [view, setView] = useState('charts');
   
   return (
-    <div id="center-panel" className="fade-in center-panel" style={{ flex: 1, minWidth: 280, maxWidth: 400, display: 'flex', flexDirection: 'column', gap: 16 }}>
-      <div style={{ background: 'white', borderRadius: 16, padding: 16, textAlign: 'center', boxShadow: '0 4px 16px rgba(74,74,74,0.08)', border: '1px solid #E5D4B7' }}>
-        <div style={{ fontSize: '0.8rem', color: '#888', marginBottom: 4 }}>Today is</div>
-        <div style={{ fontSize: '1.2rem', fontWeight: 600, color: '#4A4A4A' }}>{formatDate()}</div>
+    <div id="center-panel" className="fade-in center-panel" style={{ flex: 1, minWidth: 280, maxWidth: 400, display: 'flex', flexDirection: 'column', gap: 12 }}>
+      <div style={{ background: 'white', borderRadius: 14, padding: 14, textAlign: 'center', boxShadow: '0 4px 16px rgba(74,74,74,0.08)', border: '1px solid #E5D4B7' }}>
+        <div style={{ fontSize: '0.75rem', color: '#888', marginBottom: 2 }}>Today is</div>
+        <div style={{ fontSize: '1.1rem', fontWeight: 600, color: '#4A4A4A' }}>{formatDate()}</div>
       </div>
 
-      <div style={{ display: 'flex', gap: 8 }}>
-        {[['charts', 'BarChart3', 'Charts'], ['rewards', 'Gift', 'Rewards']].map(([v, icon, label]) => (
-          <button key={v} onClick={() => setView(v)} style={{ flex: 1, padding: '10px', borderRadius: 10, border: view === v ? 'none' : '1px solid #D4B996', background: view === v ? '#4F7942' : 'white', color: view === v ? 'white' : '#4A4A4A', fontSize: '0.85rem', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
-            <Icon name={icon} size={16} color={view === v ? 'white' : '#4F7942'} /> {label}
+      <div style={{ display: 'flex', gap: 6 }}>
+        {[['charts', 'BarChart3', 'Charts'], ['rewards', 'Gift', 'Rewards'], ['history', 'Clock', 'History']].map(([v, icon, label]) => (
+          <button key={v} onClick={() => setView(v)} style={{ flex: 1, padding: '8px', borderRadius: 8, border: view === v ? 'none' : '1px solid #D4B996', background: view === v ? '#4F7942' : 'white', color: view === v ? 'white' : '#4A4A4A', fontSize: '0.8rem', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4 }}>
+            <Icon name={icon} size={14} color={view === v ? 'white' : '#4F7942'} /> {label}
           </button>
         ))}
       </div>
 
       {view === 'charts' && (
-        <div style={{ background: 'white', borderRadius: 16, overflow: 'hidden', boxShadow: '0 4px 16px rgba(74,74,74,0.08)', border: '1px solid #E5D4B7' }}>
+        <div style={{ background: 'white', borderRadius: 14, overflow: 'hidden', boxShadow: '0 4px 16px rgba(74,74,74,0.08)', border: '1px solid #E5D4B7' }}>
           <ScoreSummary scores={scores} weeklyScores={weeklyScores} />
           <div style={{ borderTop: '1px solid #E5D4B7' }}><WeeklyChart history={history} name="Artin" /></div>
           <div style={{ borderTop: '1px solid #E5D4B7' }}><WeeklyChart history={history} name="Aiden" /></div>
+          <MonthlyProgress history={history} />
           <div style={{ borderTop: '1px solid #E5D4B7' }}><CategoryProgress dailyStates={dailyStates} name="Artin" /></div>
           <div style={{ borderTop: '1px solid #E5D4B7' }}><CategoryProgress dailyStates={dailyStates} name="Aiden" /></div>
         </div>
       )}
 
       {view === 'rewards' && (
-        <div style={{ background: 'white', borderRadius: 16, padding: 16, boxShadow: '0 4px 16px rgba(74,74,74,0.08)', border: '1px solid #E5D4B7', maxHeight: 500, overflowY: 'auto' }}>
+        <div style={{ background: 'white', borderRadius: 14, padding: 12, boxShadow: '0 4px 16px rgba(74,74,74,0.08)', border: '1px solid #E5D4B7', maxHeight: 500, overflowY: 'auto' }}>
           {['Artin', 'Aiden'].map(name => (
-            <div key={name} style={{ marginBottom: 20 }}>
-              <h4 style={{ margin: '0 0 10px', fontSize: '1rem', color: '#4A4A4A' }}>{name}'s Rewards</h4>
+            <div key={name} style={{ marginBottom: 16 }}>
+              <h4 style={{ margin: '0 0 8px', fontSize: '0.95rem', color: '#4A4A4A', display: 'flex', alignItems: 'center', gap: 6 }}>
+                <span style={{ width: 20, height: 20, borderRadius: '50%', background: getColor(scores[name] || 0), display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <Icon name="User" size={10} color="white" />
+                </span>
+                {name} <span style={{ fontSize: '0.75rem', color: '#888', fontWeight: 400 }}>({scores[name] || 0} pts)</span>
+              </h4>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                 {rewards.map(r => {
                   const can = (scores[name] || 0) >= r.points;
-                  const done = (claimed[name] || []).includes(r.id);
                   return (
-                    <div key={r.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 10px', borderRadius: 8, background: done ? '#E8F5E9' : can ? '#FEF7ED' : '#F5F5F5', border: `1px solid ${done ? '#4F7942' : can ? '#C9A882' : '#E5E5E5'}` }}>
-                      <div style={{ width: 28, height: 28, borderRadius: 6, background: done ? '#4F7942' : can ? '#C9A882' : '#D4D4D4', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                        <Icon name={r.icon} size={14} color="white" />
+                    <div key={r.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 10px', borderRadius: 8, background: can ? '#FEF7ED' : '#F5F5F5', border: `1px solid ${can ? '#C9A882' : '#E5E5E5'}` }}>
+                      <div style={{ width: 26, height: 26, borderRadius: 6, background: can ? '#C9A882' : '#D4D4D4', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        <Icon name={r.icon} size={13} color="white" />
                       </div>
                       <div style={{ flex: 1 }}>
                         <div style={{ fontWeight: 600, color: '#4A4A4A', fontSize: '0.8rem' }}>{r.label}</div>
-                        <div style={{ fontSize: '0.7rem', color: '#888' }}>{r.points} pts</div>
+                        <div style={{ fontSize: '0.65rem', color: '#888' }}>{r.points} pts</div>
                       </div>
-                      {done && <Icon name="Check" size={16} color="#4F7942" />}
-                      {!done && can && <span style={{ fontSize: '0.7rem', color: '#4F7942', fontWeight: 600 }}>✓ Available</span>}
-                      {!done && !can && <span style={{ fontSize: '0.7rem', color: '#999' }}>{r.points - (scores[name] || 0)} more</span>}
+                      {can && isAdmin ? (
+                        <button onClick={() => onClaimReward(name, r)} style={{ padding: '5px 10px', borderRadius: 6, border: 'none', background: '#4F7942', color: 'white', fontSize: '0.7rem', fontWeight: 600, cursor: 'pointer' }}>Claim</button>
+                      ) : can ? (
+                        <span style={{ fontSize: '0.65rem', color: '#4F7942', fontWeight: 600 }}>✓ Available</span>
+                      ) : (
+                        <span style={{ fontSize: '0.65rem', color: '#999' }}>{r.points - (scores[name] || 0)} more</span>
+                      )}
                     </div>
                   );
                 })}
@@ -664,19 +772,31 @@ function CenterPanel({ scores, weeklyScores, history, dailyStates, claimed }) {
         </div>
       )}
 
-      <div style={{ background: 'white', borderRadius: 16, padding: 16, boxShadow: '0 4px 16px rgba(74,74,74,0.08)', border: '1px solid #E5D4B7' }}>
-        <h4 style={{ margin: '0 0 12px', fontSize: '0.9rem', color: '#4A4A4A', textAlign: 'center' }}>Weekly Goal: 150 pts</h4>
+      {view === 'history' && (
+        <div style={{ background: 'white', borderRadius: 14, overflow: 'hidden', boxShadow: '0 4px 16px rgba(74,74,74,0.08)', border: '1px solid #E5D4B7' }}>
+          <RewardHistory claimHistory={claimHistory} />
+          {!Object.values(claimHistory).some(arr => arr.length > 0) && (
+            <div style={{ padding: 30, textAlign: 'center', color: '#888' }}>
+              <Icon name="Gift" size={32} color="#D4B996" />
+              <p style={{ marginTop: 10, fontSize: '0.85rem' }}>No rewards claimed yet</p>
+            </div>
+          )}
+        </div>
+      )}
+
+      <div style={{ background: 'white', borderRadius: 14, padding: 12, boxShadow: '0 4px 16px rgba(74,74,74,0.08)', border: '1px solid #E5D4B7' }}>
+        <h4 style={{ margin: '0 0 10px', fontSize: '0.85rem', color: '#4A4A4A', textAlign: 'center' }}>Weekly Goal: 150 pts</h4>
         {['Artin', 'Aiden'].map(name => {
           const score = weeklyScores[name] || 0;
           const pct = Math.min(100, Math.max(0, (score / 150) * 100));
           return (
-            <div key={name} style={{ marginBottom: 10 }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
-                <span style={{ fontSize: '0.8rem', fontWeight: 600, color: '#4A4A4A' }}>{name}</span>
-                <span style={{ fontSize: '0.8rem', color: score >= 0 ? '#4F7942' : '#B85C38' }}>{score}/150 {score >= 150 && '🎉'}</span>
+            <div key={name} style={{ marginBottom: 8 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 3 }}>
+                <span style={{ fontSize: '0.75rem', fontWeight: 600, color: '#4A4A4A' }}>{name}</span>
+                <span style={{ fontSize: '0.75rem', color: score >= 0 ? '#4F7942' : '#B85C38' }}>{score}/150 {score >= 150 && '🎉'}</span>
               </div>
-              <div style={{ height: 10, background: '#E5D4B7', borderRadius: 5, overflow: 'hidden' }}>
-                <div style={{ width: `${pct}%`, height: '100%', background: getColor(score), borderRadius: 5, transition: 'width 0.3s' }} />
+              <div style={{ height: 8, background: '#E5D4B7', borderRadius: 4, overflow: 'hidden' }}>
+                <div style={{ width: `${pct}%`, height: '100%', background: getColor(score), borderRadius: 4 }} />
               </div>
             </div>
           );
@@ -712,12 +832,11 @@ function App() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [history, setHistory] = useState({ Artin: [], Aiden: [] });
-  const [claimed, setClaimed] = useState({ Artin: [], Aiden: [] });
+  const [claimHistory, setClaimHistory] = useState({ Artin: [], Aiden: [] });
   const [avatars, setAvatars] = useState({ Artin: null, Aiden: null });
 
   const isAdmin = authMode === 'admin';
 
-  // Derive all scores from history (single source of truth)
   const scores = useMemo(() => calculateScores(history), [history]);
   const weeklyScores = useMemo(() => calculateWeeklyScores(history), [history]);
   const todayScores = useMemo(() => calculateTodayScores(history), [history]);
@@ -728,7 +847,6 @@ function App() {
   const loadData = async () => {
     setLoading(true);
     
-    // Load avatars
     const savedAvatars = localStorage.getItem('bt_avatars');
     if (savedAvatars) setAvatars(JSON.parse(savedAvatars));
 
@@ -736,34 +854,32 @@ function App() {
       const data = await api.getData();
       if (data && data.history) {
         setHistory(data.history);
-        setClaimed(data.claimed || { Artin: [], Aiden: [] });
+        setClaimHistory(data.claimHistory || { Artin: [], Aiden: [] });
       } else {
-        // Fallback to localStorage
-        const saved = localStorage.getItem('bt_data_v8');
+        const saved = localStorage.getItem('bt_data_v9');
         if (saved) {
           const localData = JSON.parse(saved);
           setHistory(localData.history || { Artin: [], Aiden: [] });
-          setClaimed(localData.claimed || { Artin: [], Aiden: [] });
+          setClaimHistory(localData.claimHistory || { Artin: [], Aiden: [] });
         }
       }
     } catch (e) { 
       console.error('Load error:', e);
-      const saved = localStorage.getItem('bt_data_v8');
+      const saved = localStorage.getItem('bt_data_v9');
       if (saved) {
         const localData = JSON.parse(saved);
         setHistory(localData.history || { Artin: [], Aiden: [] });
-        setClaimed(localData.claimed || { Artin: [], Aiden: [] });
+        setClaimHistory(localData.claimHistory || { Artin: [], Aiden: [] });
       }
     }
     setLoading(false);
   };
 
-  // Save to localStorage whenever history changes
   useEffect(() => {
     if (authMode && !loading) {
-      localStorage.setItem('bt_data_v8', JSON.stringify({ history, claimed }));
+      localStorage.setItem('bt_data_v9', JSON.stringify({ history, claimHistory }));
     }
-  }, [history, claimed, authMode, loading]);
+  }, [history, claimHistory, authMode, loading]);
 
   const handleAvatarUpload = (name, dataUrl) => {
     if (!isAdmin) return;
@@ -772,19 +888,44 @@ function App() {
     localStorage.setItem('bt_avatars', JSON.stringify(newAvatars));
   };
 
-  const record = async (child, behavior) => {
+  const record = async (child, item, type) => {
     if (!isAdmin) return;
     
-    // Check if already recorded today
-    const currentDailyStates = buildDailyStates(history);
-    if (currentDailyStates[child]?.[behavior.behaviorId]) return;
-
-    setSaving(true);
-    const entry = { ...behavior, timestamp: new Date().toISOString(), date: today() };
+    const todayStr = today();
+    const behaviorId = item.id;
+    const currentState = dailyStates[child]?.[behaviorId];
     
-    setHistory(h => ({ ...h, [child]: [entry, ...h[child]] }));
+    // If same type, do nothing
+    if (currentState === type) return;
+    
+    setSaving(true);
+    
+    // If there's an existing entry for today, remove it first
+    if (currentState) {
+      setHistory(h => ({
+        ...h,
+        [child]: h[child].filter(entry => !(entry.date === todayStr && entry.behaviorId === behaviorId))
+      }));
+    }
+    
+    // Add new entry
+    const points = type === 'positive' ? item.points : -item.points;
+    const label = type === 'positive' ? item.posLabel : item.negLabel;
+    const entry = {
+      id: `${behaviorId}-${type}`,
+      behaviorId,
+      label,
+      points,
+      type,
+      timestamp: new Date().toISOString(),
+      date: todayStr
+    };
+    
+    setHistory(h => ({ ...h, [child]: [entry, ...h[child].filter(e => !(e.date === todayStr && e.behaviorId === behaviorId))] }));
 
-    try { await api.recordBehavior(child, behavior); } catch (e) { console.error(e); }
+    try { 
+      await api.recordBehavior(child, { ...entry, swapped: !!currentState }); 
+    } catch (e) { console.error(e); }
     setSaving(false);
   };
 
@@ -803,9 +944,35 @@ function App() {
     if (!confirm(`Reset ${child}'s score and history? This cannot be undone.`)) return;
     
     setHistory(h => ({ ...h, [child]: [] }));
-    setClaimed(c => ({ ...c, [child]: [] }));
 
     try { await api.resetChild(child); } catch (e) { console.error(e); }
+  };
+
+  const claimReward = async (child, reward) => {
+    if (!isAdmin) return;
+    if (scores[child] < reward.points) return;
+    
+    // Deduct points by adding negative entry
+    const entry = {
+      id: `reward-${reward.id}-${Date.now()}`,
+      label: `Claimed: ${reward.label}`,
+      points: -reward.points,
+      type: 'reward',
+      timestamp: new Date().toISOString(),
+      date: today()
+    };
+    
+    setHistory(h => ({ ...h, [child]: [entry, ...h[child]] }));
+    
+    // Add to claim history
+    const claim = {
+      rewardId: reward.id,
+      timestamp: new Date().toISOString(),
+      points: reward.points
+    };
+    setClaimHistory(ch => ({ ...ch, [child]: [claim, ...(ch[child] || [])] }));
+
+    try { await api.claimReward(child, reward); } catch (e) { console.error(e); }
   };
 
   const logout = () => { localStorage.removeItem('bt_auth'); setAuthMode(null); };
@@ -848,7 +1015,7 @@ function App() {
 
       <main className="three-panel" style={{ display: 'flex', gap: 20, padding: 20, maxWidth: 1400, margin: '0 auto', alignItems: 'flex-start' }}>
         <ChildPanel name="Artin" panelId="artin-panel" scores={scores} weeklyScores={weeklyScores} todayScores={todayScores} history={history} dailyStates={dailyStates} avatar={avatars.Artin} onRecord={record} onUndo={undo} onReset={resetChild} onAvatarUpload={handleAvatarUpload} loading={saving} isAdmin={isAdmin} />
-        <CenterPanel scores={scores} weeklyScores={weeklyScores} history={history} dailyStates={dailyStates} claimed={claimed} />
+        <CenterPanel scores={scores} weeklyScores={weeklyScores} history={history} dailyStates={dailyStates} claimHistory={claimHistory} onClaimReward={claimReward} isAdmin={isAdmin} />
         <ChildPanel name="Aiden" panelId="aiden-panel" scores={scores} weeklyScores={weeklyScores} todayScores={todayScores} history={history} dailyStates={dailyStates} avatar={avatars.Aiden} onRecord={record} onUndo={undo} onReset={resetChild} onAvatarUpload={handleAvatarUpload} loading={saving} isAdmin={isAdmin} />
       </main>
 
